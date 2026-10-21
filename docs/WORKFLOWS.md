@@ -23,3 +23,9 @@ Menu determinístico: 1 Natal 2026; 2 agendamentos; 3 fotos e pedidos; 4 localiz
 - Persistir estado, cooldown, pausa humana, recibos e efeitos incertos.
 - Manter flags de execução OFF até canário autorizado.
 - Sem webhook novo sobrescrever assinaturas existentes. Primeira tarefa do Antigravity é entender a topologia da VPS.
+
+
+## Distinção necessária para o Flash Lite
+`internal/workflow/plan.go` gera somente um plano de efeitos, nunca executa. O receptor `internal/ingress/server.go` salva a decisão no spool como `planned_preview_only`; ele NÃO tem worker. O fluxo de saudação deve enviar imagem somente se `IsGreetingDue(last, now, cooldown, humanPaused)` retornar TRUE; durante cooldown ou pausa humana NUNCA repetir.
+
+Ordem desejada em ADS: texto → tentar áudio → solicitar CRM independentemente do resultado do áudio, mas com lead claim e journal de intenções. O `instanceToken` do webhook não autentica o evento. É proibido apontar uma instância real à rota antes de concluir o executor durável e conferir o mapeamento de UUID.
