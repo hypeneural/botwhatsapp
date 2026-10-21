@@ -19,6 +19,7 @@ type Envelope struct {
    ID string `json:"ID"`
    Chat string `json:"Chat"`
    Sender string `json:"Sender"`
+   SenderAlt string `json:"SenderAlt"`
    IsFromMe bool `json:"IsFromMe"`
    PushName string `json:"PushName"`
   } `json:"Info"`
@@ -47,6 +48,7 @@ type Decision struct {
  InstanceID string `json:"instance_id"`
  MessageID string `json:"message_id"`
  PhoneE164 string `json:"phone_e164"`
+ ReplyJID string `json:"reply_jid,omitempty"`
  CRMPhone string `json:"crm_phone,omitempty"`
  Name string `json:"name,omitempty"`
  Option string `json:"option,omitempty"`
@@ -85,7 +87,15 @@ func Select(e Envelope,c Config) Decision {
  d:=Decision{Action:Ignore,InstanceID:e.InstanceID,MessageID:e.Data.Info.ID}
  if e.Event!="Message" || e.Data.Info.IsFromMe || e.Data.Info.ID=="" {d.Reason="not_new_inbound";return d}
  if e.InstanceID!=c.AdsUUID && e.InstanceID!=c.GreetingUUID {d.Reason="unknown_instance";return d}
- phone,ok:=JIDPhone(e.Data.Info.Chat)
+ chat:=e.Data.Info.Chat
+ if strings.HasSuffix(chat,"@g.us")||strings.HasSuffix(chat,"@newsletter")||strings.Contains(chat,"broadcast"){d.Reason="non_private_chat";return d}
+ // Keep the chat JID for replies. A LID's digits are never a phone number.
+ d.ReplyJID=chat
+ phone,ok:=JIDPhone(chat)
+ if !ok && strings.HasSuffix(chat,"@lid"){
+  phone,ok=JIDPhone(e.Data.Info.Sender)
+  if !ok {phone,ok=JIDPhone(e.Data.Info.SenderAlt)}
+ }
  if !ok {d.Reason="unresolved_phone_or_non_private_chat";return d}
  d.PhoneE164=phone
  d.CRMPhone,_=CRMPhone(phone)
@@ -96,6 +106,10 @@ func Select(e Envelope,c Config) Decision {
  if body=="" {body=e.Data.Message.Extended.Text}
  body=Normalize(body)
  if body=="" {d.Reason="no_text";return d}
+ switch body {
+ case "parar","sair","cancelar","não quero","nao quero","stop","unsubscribe":
+  d.Reason="opt_out_requires_persistent_suppression";return d
+ }
  if e.InstanceID==c.AdsUUID {
   for _,t:=range c.AdsTriggers {if body!="" && body==Normalize(t) {d.Action=AdsProposal;return d}}
   if !c.AdsFallback {d.Reason="unmatched_ads";return d}
