@@ -33,3 +33,15 @@ Não associar número ao UUID Evolution Go sem prova, nem UUID Evolution ao `mes
 - https://github.com/6justgotme/evolution-go-skill
 - https://github.com/estevao-tarifa/evo-chatwoot-bridge-go (MIT; preservar licença ao adaptar trechos)
 - https://github.com/hypeneural/evydencia-crm (somente leitura)
+
+
+## Status de código, 21/10/2026
+- Auditoria forense: `docs/FORENSIC-AUDIT-2026-10-21.md` (inventário da VPS é RELATO do AntiGravity, não nova inspeção remota).
+- Base escrita: `internal/core` (roteamento), `internal/workflow` (plano/cooldown), `internal/evolution` (cliente HTTP não conectado), `internal/crm` (contrato/cliente HTTP não conectado), `internal/ingress` (webhook com dedup e spool em **prévia**), `cmd/botwhatsapp`.
+- Para construir/testar: `go test ./...`. `Dockerfile` multi-stage compila sem Go no host; não fazer deploy nesta fase.
+- ATENÇÃO: código atual NÃO ENVIA mensagens nem chama CRM. Nunca interpretar `readyz` como aprovação comercial; apenas confirma receptor preview.
+- Sem worker/outbox com recuperação e lead claims, NÃO ligar nenhum adaptador aos webhooks de produção. Próximas etapas: `docs/IMPLEMENTATION-NEXT.md`.
+- `WEBHOOK_URL` (não `GLOBAL_WEBHOOK`) é a variável oficial do webhook global; ausência ainda NÃO CONFIRMADA na VPS.
+- `127.0.0.1:14000` identifica a API no HOST, não dentro de novos containers.
+- Antes de POST CRM real é obrigatória instância de saída numérica explícita (>0), além da confirmação da campanha 415 ou 416 em produção.
+- Skills novas: `.agents/skills/evolution-go-v072-adapter/SKILL.md` e `.agents/skills/bot-contract-tests/SKILL.md`. Essas skills CURADAS apontam para código upstream e não instalam software externo.
