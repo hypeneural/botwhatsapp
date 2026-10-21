@@ -44,3 +44,13 @@ O projeto usa somente a biblioteca padrão Go 1.23. A imagem Docker usa build mu
 Duas instâncias pareadas, UUIDs, texto do anúncio, áudio e imagem aprovados, ID numérico da instância de SAÍDA no CRM, verificação de campanhas ativas, outbox durável de efeitos, pausa humana/cooldown persistente, opt-out persistente e canário autorizado. **Não reconfigurar Evolution Go ou CRM até conclusão desses itens.**
 
 Este é um serviço futuro independente: não modificar `hypeneural/evydencia-crm`, Caddy, Asterisk ou aplicações vizinhas da VPS.
+
+## Simulador offline para o AntiGravity
+Sem ligar nenhum número real, o agente pode executar:
+```bash
+go run ./cmd/simulate ./testdata/ads.json
+go run ./cmd/simulate ./testdata/greeting.json
+go run ./cmd/simulate ./testdata/menu-human.json
+go run ./cmd/simulate ./testdata/opt-out.json
+```
+Os arquivos são **sintéticos**; `instance=999999` impresso pelo simulador é EXCLUSIVAMENTE fictício. Instruções para o próximo ciclo: `docs/PROMPT-ANTIGRAVITY-NEXT.md`. Performance: `docs/PERFORMANCE-POLICY.md`.
