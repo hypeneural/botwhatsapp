@@ -27,3 +27,11 @@ Este repositório foi criado em 21/10/2026 para dois bots simples usando Evoluti
 | 48 99642-5287 | Saudação: foto+caption e menu | Não acionar campanha automaticamente |
 
 Os telefones **não identificam** por si só UUID Evolution Go nem instância de saída do CRM.
+
+
+## Fase 1 documentada, próximo trabalho permitido
+A Fase 1 foi relatada pelo AntiGravity e revisada estaticamente. **Não repetir o inventário bruto da VPS sem novo motivo.** Há resumo com dúvidas em `docs/FORENSIC-AUDIT-2026-10-21.md`.
+
+Agora ler `docs/IMPLEMENTATION-NEXT.md` e as skills `evolution-go-v072-adapter` e `bot-contract-tests`. Executar `go test ./...` LOCALMENTE uma vez; contratos já têm implementações puras e tests. Corrigir só falhas reais. Depois preparar outbox durável e teste crash/restart; não configurar instâncias nem ativar envios ainda.
+
+**Atenção:** a fonte oficial usa `WEBHOOK_URL`, não `GLOBAL_WEBHOOK`. A sugestão do relatório de validar `instanceToken` como assinatura foi rejeitada. LID não representa telefone; usar mapeamento explícito, ou não agendar.
