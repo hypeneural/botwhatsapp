@@ -17,3 +17,9 @@ Arquivos: `pkg/routes/routes.go`, `pkg/sendMessage/service/send_service.go`, `pk
 6. Não inferir telefone real a partir de LID; mapear UUID de cada instância somente com evidência.
 7. Relatório de contratos confirmados, dúvidas e riscos. Sem testes de envio real.
 Referências: https://github.com/6justgotme/evolution-go-skill (MIT; conferir contra fonte da versão); https://github.com/estevao-tarifa/evo-chatwoot-bridge-go (MIT).
+
+
+## Errata 2026-10-21
+Segundo o inventário, versão anunciada na VPS é `0.7.2` com patch local para WebP animado; commit exato do patch ainda é desconhecido. Consulte `evolution-go-v072-adapter` e `docs/FORENSIC-AUDIT-2026-10-21.md`.
+
+`WEBHOOK_URL` é a variável global do código oficial, NÃO `GLOBAL_WEBHOOK`. O relatório anterior não comprova sozinho que o webhook global esteja desativado. O campo de payload `instanceToken` é segredo, NÃO HMAC. Conferir volumes/consumidores e isolamento antes de instalar novas instâncias.
