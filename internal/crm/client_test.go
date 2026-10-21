@@ -14,7 +14,8 @@ func TestCRMClient(t *testing.T){
   _,_=w.Write([]byte(`{"data":{"id":4721,"campaign":416,"status":{"name":"scheduled"}}}`))
  }))
  defer h.Close()
- p,err:=Build("48996425287","",nil);if err!=nil{t.Fatal(err)}
+ mid:=42
+ p,err:=Build("48996425287","",&mid);if err!=nil{t.Fatal(err)}
  id,err:=(Client{BaseURL:h.URL,Authorization:"exact-service-token"}).Schedule(context.Background(),p)
  if id!=4721||err!=nil{t.Fatal(id,err)}
  missing:=httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter,r *http.Request){_,_=w.Write([]byte(`{"data":null}`))}))
@@ -23,4 +24,7 @@ func TestCRMClient(t *testing.T){
  if !errors.Is(err,ErrUnconfirmed){t.Fatal("ambiguous response must not auto retry",err)}
  _,err=(Client{BaseURL:h.URL,Authorization:""}).Schedule(context.Background(),p)
  if !errors.Is(err,ErrInvalidRequest){t.Fatal(err)}
+ p.Instance=nil
+ _,err=(Client{BaseURL:h.URL,Authorization:"token"}).Schedule(context.Background(),p)
+ if !errors.Is(err,ErrInvalidRequest){t.Fatal("implicit favorite CRM instance forbidden",err)}
 }
