@@ -17,3 +17,9 @@ O POST cria agendamento e **não é confirmação de entrega**. Não contém cha
 `GET /api/campaigns/schedule/search` permite consulta por campanha ou telefone, mas resultados podem ser insuficientes para reconciliar ambiguidades em concorrência. Não alterar CRM para adicionar campos.
 
 **NÃO CONFIRMADOS:** URL exata, ID campanha Natal 2026, ID da instância de saída, token, opt-in/consentimento e disponibilidade de serviço. Preflight sem POST real.
+
+
+## Comprovações e ajuste de segurança posterior
+`Natal2026ProposalManifest::VARIANTS` no GitHub confirma `415 = with_name` e `416 = without_name`; NÃO confirma que estão ativas ou provisionadas no DB do CRM. `CampaignScheduledResource` serializa `data.id` e `data.campaign`; aceitar agendamento só se resposta 2xx e ID de agendamento positivo/campanha correspondente.
+
+`internal/crm/contract.go` constrói as duas variantes. `internal/crm/client.go` exige ID numérico explícito e positivo de saída do CRM (diferentemente da API legada, que aceita null). Isso evita usar por acidente a instância preferencial de número desconhecido. O cliente ainda NÃO está conectado ao receptor. Resultado HTTP incerto bloqueia reenvio automático e exige reconciliação.
