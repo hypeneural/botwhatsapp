@@ -1,0 +1,26 @@
+name: Go offline contract tests
+on:
+  push:
+    paths:
+      - 'go.mod'
+      - 'cmd/**'
+      - 'internal/**'
+      - '.github/workflows/go-test.yml'
+  pull_request:
+    paths:
+      - 'go.mod'
+      - 'cmd/**'
+      - 'internal/**'
+      - '.github/workflows/go-test.yml'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - run: go test ./...
