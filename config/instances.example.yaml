@@ -1,0 +1,36 @@
+# CONFIGURAÇÃO DE EXEMPLO. NÃO ATIVAR sem validação.
+enabled: false
+evolution:
+  base_url_env: EVOLUTION_GO_BASE_URL
+  installed_version: null
+  installed_digest: null
+crm:
+  base_url_env: EVIDENCIA_CRM_BASE_URL
+  authorization_env: EVIDENCIA_CRM_AUTHORIZATION
+  campaign_id_natal_2026: null
+  outbound_message_instance_id: null
+instances:
+  paid_traffic:
+    enabled: false
+    business_phone_e164: "554832200440"
+    instance_uuid: null
+    token_env: EVOLUTION_ADS_APIKEY
+    exact_ad_phrases: []
+    response_text: "Oii! Tudo bem? 🎄❤️ Que alegria receber seu contato! Vamos enviar a proposta de Natal 2026 por outro WhatsApp oficial do Estúdio Evidência."
+    audio_file: null
+    fallback_menu_enabled: true
+  greeting:
+    enabled: false
+    business_phone_e164: "5548996425287"
+    instance_uuid: null
+    token_env: EVOLUTION_GREETING_APIKEY
+    image_file: null
+    caption_file: config/greeting-caption.txt
+    cooldown_hours: 24
+    menu:
+      "1": natal
+      "2": agendamento
+      "3": pedidos
+      "4": localizacao
+      "5": humano
+    location_url: https://ir.fotosdenatal.com/
