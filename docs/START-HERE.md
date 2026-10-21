@@ -1,37 +1,33 @@
-# Primeira tarefa Antigravity Flash Lite — auditoria, NÃO implantação
+# Início rápido — Antigravity Flash Lite
 
-Este repositório foi criado em 21/10/2026 para dois bots simples usando Evolution Go existente na VPS Contabo.
+**Hoje:** ler, simular e implementar offline. **Não instalar nem disparar.**
 
-**Primeiro resultado esperado: relatório sanitizado da versão da Evolution Go e inventário de dependências da VPS.** Não instalar serviços, não executar testes com números reais e não mudar o CRM.
+## 1. Estado confirmado vs relatado
+- Fase 1: inventário da VPS relatado pelo AntiGravity, resumido com ressalvas em `docs/FORENSIC-AUDIT-2026-10-21.md`.
+- Evolution Go anunciada na Contabo: 0.7.2 com patch local; duas instâncias dos números-alvo NÃO encontradas naquele inventário.
+- Repo atual: código Go `preview-only`, não dispara WhatsApp/CRM.
+- Contrato CRM: campanhas 415 (com nome) e 416 (sem nome) identificadas no código; estado live ainda pendente.
 
-1. Ler `AGENTS.md` e executar a skill `.agents/skills/vps-readonly-audit/SKILL.md`.
-2. Identificar contêiner/imagem/tag/digest Evolution Go, recursos, portas, redes e demais serviços da VPS por metadados; nunca copiar env/logs/DB/segredos.
-3. Executar a skill `.agents/skills/evolution-go-preflight/SKILL.md`. Conferir `/send/text`, `/send/media`, `/instance/status`, envelopes de webhook e seus consumidores *na versão instalada*; `POST /instance/connect` é mutativo e proibido na auditoria.
-4. Executar `.agents/skills/crm-readonly-contract/SKILL.md` apenas por consulta GitHub e APIs de leitura autorizadas.
-5. Preencher um relatório local em `reports/vps-inventory.redacted.md` (ignorado pelo Git) e pendências abaixo.
-6. Parar. Somente depois da análise haverá desenvolvimento seguindo `.agents/skills/two-bot-workflows/SKILL.md`.
+## 2. Primeiros comandos no clone local
+```bash
+git status --short
+# Se working tree limpo:
+git pull --ff-only origin main
+go test ./...
+go run ./cmd/simulate ./testdata/ads.json
+go run ./cmd/simulate ./testdata/greeting.json
+go run ./cmd/simulate ./testdata/menu-human.json
+go run ./cmd/simulate ./testdata/opt-out.json
+```
+Fixtures são fictícias e NÃO utilizam tokens, números reais de clientes ou rede. Em máquina sem Go, primeiro leia GitHub Actions PASS; não instalar Go na VPS só para rodar os testes.
 
-## Pendências não resolvidas
-- Versão/tag/digest, configuração e quantidade de instâncias reais Evolution Go.
-- UUID seguro de cada instância ligada aos dois telefones.
-- Webhooks globais e por instância e seus consumidores atuais.
-- Texto literal do anúncio do Meta Ads.
-- Áudio gravado, arquivo de imagem JPG/PNG e legenda final.
-- URL de serviço, campanha Natal 2026 e ID numérico da instância de saída do CRM; validar política de disparos.
-- SSH autorizado e quais serviços da VPS compartilham rede/proxy/portas.
+## 3. Próximo desenvolvimento
+**Siga o prompt completo em `docs/PROMPT-ANTIGRAVITY-NEXT.md`.** O principal trabalho restante é outbox durável, cooldown/pause/opt-out persistentes, recuperação após reinício e testes mocks.
 
-## Matriz de identidade
-| Telefone | Papel | No CRM |
-|---|---|---|
-| 48 3220-0440 | Inbound Meta Ads, texto+áudio e requisição ao CRM | Solicitar campanha configurada de Natal pelo número de SAÍDA já existente no CRM |
-| 48 99642-5287 | Saudação: foto+caption e menu | Não acionar campanha automaticamente |
-
-Os telefones **não identificam** por si só UUID Evolution Go nem instância de saída do CRM.
-
-
-## Fase 1 documentada, próximo trabalho permitido
-A Fase 1 foi relatada pelo AntiGravity e revisada estaticamente. **Não repetir o inventário bruto da VPS sem novo motivo.** Há resumo com dúvidas em `docs/FORENSIC-AUDIT-2026-10-21.md`.
-
-Agora ler `docs/IMPLEMENTATION-NEXT.md` e as skills `evolution-go-v072-adapter` e `bot-contract-tests`. Executar `go test ./...` LOCALMENTE uma vez; contratos já têm implementações puras e tests. Corrigir só falhas reais. Depois preparar outbox durável e teste crash/restart; não configurar instâncias nem ativar envios ainda.
-
-**Atenção:** a fonte oficial usa `WEBHOOK_URL`, não `GLOBAL_WEBHOOK`. A sugestão do relatório de validar `instanceToken` como assinatura foi rejeitada. LID não representa telefone; usar mapeamento explícito, ou não agendar.
+## 4. Regras que não podem ser violadas
+- `hypeneural/evydencia-crm` = SOMENTE LEITURA.
+- Nenhuma alteração em Evolution GO, Caddy, Asterisk, SmartDialer, motor de status, Captive Portal ou outros serviços.
+- Não autenticar webhook pelo campo `instanceToken`; segredo independente por rota/rede privada.
+- A variável correta do webhook GLOBAL do Evolution Go é `WEBHOOK_URL`, não `GLOBAL_WEBHOOK`.
+- É preciso confirmar instância de envio CRM, não confiar automaticamente em seu favorito.
+- Imagem, áudio, frase real, pareamento e campanha ativa são pendências para fase autorizada.
