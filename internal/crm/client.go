@@ -18,7 +18,7 @@ var ErrInvalidRequest=errors.New("crm: invalid base URL, token or campaign paylo
 type Client struct {BaseURL string;Authorization string;HTTP *http.Client}
 func(c Client) Schedule(ctx context.Context,req Request)(int,error){
  base,err:=url.Parse(c.BaseURL)
- if err!=nil||base.Host==""||base.Scheme!="https"&&base.Scheme!="http"||base.User!=nil||base.RawQuery!=""||base.Fragment!=""||base.Path!=""||c.Authorization==""||req.Campaign!=WithName&&req.Campaign!=WithoutName||req.Contacts=="" {
+ if err!=nil||base.Host==""||base.Scheme!="https"&&base.Scheme!="http"||base.User!=nil||base.RawQuery!=""||base.Fragment!=""||base.Path!=""||c.Authorization==""||req.Campaign!=WithName&&req.Campaign!=WithoutName||req.Contacts==""||req.Instance==nil||*req.Instance<=0 {
   return 0,ErrInvalidRequest
  }
  b,err:=Encode(req);if err!=nil{return 0,ErrInvalidRequest}
