@@ -1,0 +1,6 @@
+{
+ "event": "Message",
+ "instanceId": "greeting-demo",
+ "instanceName": "greeting-ficticia",
+ "data": {"Info":{"ID":"fixture-greet-1","Chat":"5548999999999@s.whatsapp.net","IsFromMe":false},"Message":{"conversation":"Bom dia"}}
+}
