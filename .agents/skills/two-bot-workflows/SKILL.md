@@ -13,3 +13,9 @@ Não iniciar esta skill antes de conclusão do inventário VPS e confirmação d
 **Geral**: serviço pequeno Go em container separado; SQLite/WAL persistente ou DB existente somente se adequado; tokens distintos e flags OFF. Sem n8n, Redis, IA/LLM, painel. Não tocar core Evolution, não tocar CRM. Nunca associar LID sem telefone validado à campanha. Não retry cego de POST CRM ou envio de mídia com resultado desconhecido. Webhook autenticado por segredo próprio/rede interna, não instanceToken.
 
 Testes locais mockados: mensagem do anúncio, fallback, imagem+caption, menu, duplicidade, concorrência, restart, timeout CRM incerto, falha áudio independente, humana pausa. Somente canário autorizado depois de revisão.
+
+
+## Implementação existente; não reinventar
+Já existem `internal/core`, `internal/workflow`, `internal/ingress`, `internal/evolution`, `internal/crm` e `cmd/botwhatsapp`. A versão publicada é de **PREVIEW**, sem qualquer envio. Primeiro `go test ./...`; inspecionar `docs/IMPLEMENTATION-NEXT.md`.
+
+NÃO conectar imediatamente `SendText`, `SendMedia` ou `Schedule` dentro do handler: implementar worker e outbox durável com claims por lead (contato+campanha), separadas do hash (instância+event+messageID). Registrar `attempt_started` e fsync antes de POST; após crash, resultado desconhecido fica suspenso, nunca repetir. Persistir pausa humana, cooldown e opt-out. Campanha com nome 415 ou sem nome 416, ambas condicionadas à configuração operacional. Exigir ID numérico de instância CRM real (>0). Cuidado com LID e SenderAlt: somente JID telefônico autoritativo pode preencher CRM. Teste mockado de conexão/campanha apenas.
