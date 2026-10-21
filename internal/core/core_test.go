@@ -31,6 +31,17 @@ func TestEnvelope(t *testing.T){
  if err!=nil||e.Data.Message.Extended.Text!="1"{t.Fatal(err,e)}
  if _,err:=json.Marshal(e);err!=nil{t.Fatal(err)}
 }
+func TestSenderAltAndOptOut(t *testing.T){
+ c:=Config{AdsUUID:"ads",GreetingUUID:"greeting",AdsTriggers:[]string{"quero natal"}}
+ e:=fixture("ads","876543@lid","quero natal","m1")
+ e.Data.Info.SenderAlt="5548996425287@s.whatsapp.net"
+ d:=Select(e,c)
+ if d.Action!=AdsProposal||d.PhoneE164!="5548996425287"||d.ReplyJID!="876543@lid"{t.Fatalf("explicit alt mapping: %+v",d)}
+ e.Data.Info.SenderAlt=""
+ if got:=Select(e,c);got.Action!=Ignore{t.Fatalf("cannot infer LID phone: %+v",got)}
+ e=fixture("greeting","5548996425287@s.whatsapp.net","PARAR","m2")
+ if got:=Select(e,c);got.Action!=Ignore{t.Fatalf("opt out must not greet: %+v",got)}
+}
 func TestCRMPhone(t *testing.T){
  for _,s:=range []string{"5548996425287","554832200440"} {if _,ok:=CRMPhone(s);!ok{t.Fatal(s)}}
  for _,s:=range []string{"48996425287","551234","5599ABCDEF999","5511111111111111"} {if _,ok:=CRMPhone(s);ok{t.Fatal("accepted",s)}}
