@@ -1,3 +1,5 @@
+# Fonte de referência editorial: docs/FORENSIC-AUDIT-2026-10-21.md
+# O serviço Go PREVIEW usa variáveis em .env.example; este YAML é a matriz de configuração FUTURA.
 # CONFIGURAÇÃO DE EXEMPLO. NÃO ATIVAR sem validação.
 enabled: false
 evolution:
@@ -7,8 +9,9 @@ evolution:
 crm:
   base_url_env: EVIDENCIA_CRM_BASE_URL
   authorization_env: EVIDENCIA_CRM_AUTHORIZATION
-  campaign_id_natal_2026: null
-  outbound_message_instance_id: null
+  campaign_with_name_id_from_manifest: 415 # ainda confirmar provisionamento em produção
+  campaign_without_name_id_from_manifest: 416 # ainda confirmar provisionamento em produção
+  outbound_message_instance_id: null # OBRIGATÓRIO explícito e >0 para produção, jamais escolher automaticamente favorito
 instances:
   paid_traffic:
     enabled: false
