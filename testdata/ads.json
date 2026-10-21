@@ -1,0 +1,6 @@
+{
+ "event": "Message",
+ "instanceId": "ads-demo",
+ "instanceName": "ads-ficticia",
+ "data": {"Info":{"ID":"fixture-ads-1","Chat":"5548999999999@s.whatsapp.net","IsFromMe":false,"PushName":"Cliente Teste"},"Message":{"conversation":"Quero a proposta de Natal 2026"}}
+}
