@@ -12,6 +12,9 @@ on:
       - 'cmd/**'
       - 'internal/**'
       - '.github/workflows/go-test.yml'
+concurrency:
+  group: botwhatsapp-go-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   test:
     runs-on: ubuntu-latest
