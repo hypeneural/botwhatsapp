@@ -274,8 +274,8 @@ func (w *Worker) executeScheduleNatal(ctx context.Context, task Task) error {
 		return w.recordSuppressed(task.ID, "lead already claimed in current window; duplicate campaign dispatch skipped")
 	}
 
-	// 5. Build CRM request (Campaign 415 if name valid, 416 if not)
-	req, err := crm.Build(task.CRMPhone, task.ContactName, w.cfg.CRMInstanceID)
+	// 5. Build CRM request (Default campaign is strictly 416 - Natal 2026 without name)
+	req, err := crm.BuildWithoutName(task.CRMPhone, w.cfg.CRMInstanceID)
 	if err != nil {
 		return w.recordSuppressed(task.ID, fmt.Sprintf("crm: build request rejected: %v", err))
 	}

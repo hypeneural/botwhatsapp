@@ -261,8 +261,11 @@ func TestLeadClaimDeduplication(t *testing.T) {
 	if crmMock.calls != 1 {
 		t.Fatalf("expected exactly 1 CRM schedule call, got %d", crmMock.calls)
 	}
-	if crmMock.lastReq.Campaign != crm.WithName {
-		t.Fatalf("expected campaign 415 (with name), got %d", crmMock.lastReq.Campaign)
+	if crmMock.lastReq.Campaign != crm.WithoutName {
+		t.Fatalf("expected campaign 416 (without name), got %d", crmMock.lastReq.Campaign)
+	}
+	if crmMock.lastReq.Contacts != "48999999999" {
+		t.Fatalf("expected contacts without name '48999999999', got %s", crmMock.lastReq.Contacts)
 	}
 }
 
