@@ -3,5 +3,6 @@
 # A alteração entra em vigor após reiniciar SOMENTE o bot (sem reiniciar Evolution Go).
 # Não colocar textos genéricos "natal", "oi" ou "quero informações".
 Quero conhecer os pacotes do Primeiro Natal em Tijucas
+Quero conhecer os pacotes de Natal em Tijucas
 # Exemplo de segundo criativo (descomentar SOMENTE após publicar anúncio correspondente):
 # Quero receber a proposta de Natal 2026 em Tijucas
