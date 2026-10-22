@@ -167,7 +167,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, 512<<10)
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "payload too large or unreadable", 413)
