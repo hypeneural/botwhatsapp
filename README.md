@@ -22,7 +22,7 @@ O inbound da instância `anderson` tem um webhook ocupado pelo serviço de statu
 
 ## Fluxo CTWA ativo no código (configuração comercial ainda OFF)
 
-- Texto padrão observado no relatório do Instagram: **Quero conhecer os pacotes do Primeiro Natal em Tijucas**.
+- Texto padrão observado no relatório do Instagram: **Quero conhecer os pacotes do Primeiro Natal em Tijucas** e **Quero conhecer os pacotes de Natal em Tijucas**.
 - Edite `config/ads-triggers.txt`: **uma ou mais frases completas, uma por linha**, até 50. O arquivo é carregado em `BOT_ADS_TRIGGERS_FILE` na inicialização; editar requer reinício **somente do bot** após autorização. Mensagens não correspondentes acionam a saudação no mesmo número Ads (`BOT_ADS_FALLBACK_MENU=true`).
 - Etapas do anúncio: **texto opcionalmente personalizado → áudio PTT → imagem opcional com caption → vídeo MP4 opcional com caption → CRM 416 sem nome**. Falha/ausência de mídia é registrada, sem reenvio cego nem bloqueio do CRM; o CRM só é acionado com autorização/lead validado.
 - A saudação usa uma imagem única com legenda quando configurada, senão envia o texto do menu 1–5. O número final **5287** terá somente saudação, em instância própria quando pareada.
