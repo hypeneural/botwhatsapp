@@ -216,13 +216,24 @@ func (c Client) SendReactionWithID(ctx context.Context, phone, messageID, reacti
 	if phone == "" || messageID == "" || strings.TrimSpace(reaction) == "" {
 		return "", ErrInvalid
 	}
+	cleanPhone := strings.TrimSuffix(strings.TrimPrefix(phone, "+"), "@s.whatsapp.net")
 	p := map[string]any{
-		"number":   phone,
+		"number":   cleanPhone,
 		"id":       messageID,
 		"reaction": strings.TrimSpace(reaction),
 		"fromMe":   false,
 	}
-	return c.send(ctx, "/message/react", p)
+	msgID, err := c.send(ctx, "/message/react", p)
+	if err == nil {
+		return msgID, nil
+	}
+	// In Brazil, WhatsApp JIDs for older accounts use 8 digits after DDD (strip extra leading 9):
+	// 55 + 2 DDD + 9 + 8 digits = 13 digits -> 55 + 2 DDD + 8 digits = 12 digits
+	if strings.HasPrefix(cleanPhone, "55") && len(cleanPhone) == 13 && cleanPhone[4] == '9' {
+		p["number"] = cleanPhone[:4] + cleanPhone[5:]
+		return c.send(ctx, "/message/react", p)
+	}
+	return "", err
 }
 
 // Status uses the existing read-only Evolution Go endpoint. The status is a
