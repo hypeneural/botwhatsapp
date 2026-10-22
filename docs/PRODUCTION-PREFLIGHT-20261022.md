@@ -38,3 +38,7 @@
 - NÃO executar `docker compose up/down`, deploy, mudança de webhook, reiniciar serviços, parear sessão ou reenviar campanha canário nesta missão.
 - Analisar CI do head da PR. Se PASS, integrar hotfix depois de revisão e manter flags OFF.
 - PROXIMA FASE somente após autorização do gestor: auditoria status-engine, preflight de rede/read-only, medir tamanhos de evento, limitar uso de disco, pareamento saudação/mídia e plano de rollback/monitoramento. Separar confirmação comercial do agendamento anterior de eventual novo teste.
+
+
+## Atualização da auditoria CTWA (22/10/2026)
+Payload de anúncio Meta relatado pelo Antigravity contém `extendedTextMessage.text`, `externalAdReply`, `referral` e identificação LID secundária. Corrigido encaminhamento de `AdsFallback` no Registry, catálogo editável de frases, etapa visual opcional, fallback de saudação em texto e limite de corpo 1 MiB relay/bot. Consulte `CTWA-ROUTING-20261022.md`. O anexo original não está completamente sanitizado: contém token de instância. Nenhuma credencial foi copiada para o repositório. O bot/relay permanecem desligados; antes do cutover continuam os gates de status-engine, recursos, contas e mídia.
