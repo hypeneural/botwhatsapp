@@ -1,6 +1,9 @@
 # Índice — documentação vigente vs histórico
 
 ## COMEÇAR AQUI (canonical)
+- [CTWA em produção futura](CTWA-ROUTING-20261022.md): frase real do Instagram, múltiplos gatilhos, fallback saudação Ads e ordem texto-áudio-imagem-vídeo-CRM.
+- [Skill CTWA](../.agents/skills/ctwa-ads-funnel/SKILL.md): roteiro local para Antigravity.
+
 - [README](../README.md): arquitetura, responsabilidades, dois números e posição atual.
 - [AGENTS.md](../AGENTS.md): único contrato de instruções para Antigravity.
 - [START-HERE](START-HERE.md): um script e só validações locais.
