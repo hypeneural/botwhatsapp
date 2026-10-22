@@ -158,16 +158,7 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 			task.PayloadCaption = w.cfg.GreetingCaption
 		case workflow.SendGreetingText:
 			task.PayloadText = w.cfg.GreetingCaption
-		case workflow.SendGreetingText:
-		if sender==nil{return w.recordUncertain(task.ID,"evolution sender not configured")}
-		id,err:=sender.SendText(ctx,task.RecipientJID,task.PayloadText)
-		if err!=nil{return w.recordUncertain(task.ID,err.Error())}
-		contact.LastGreetingAt=time.Now().UTC()
-		if err:=w.store.SaveContact(contact);err!=nil{
-			return w.recordUncertain(task.ID,"text greeting sent; cooldown persistence failed")
-		}
-		return w.recordConfirmed(task.ID,id)
-	case workflow.SendMenuReply:
+		case workflow.SendMenuReply:
 			task.PayloadText = plan.Message
 		}
 
@@ -307,6 +298,17 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 			return w.recordUncertain(task.ID, "greeting sent; contact cooldown persistence failed")
 		}
 		return w.recordConfirmed(task.ID, extID)
+
+
+	case workflow.SendGreetingText:
+		if sender==nil{return w.recordUncertain(task.ID,"evolution sender not configured")}
+		id,err:=sender.SendText(ctx,task.RecipientJID,task.PayloadText)
+		if err!=nil{return w.recordUncertain(task.ID,err.Error())}
+		contact.LastGreetingAt=time.Now().UTC()
+		if err:=w.store.SaveContact(contact);err!=nil{
+			return w.recordUncertain(task.ID,"text greeting sent; cooldown persistence failed")
+		}
+		return w.recordConfirmed(task.ID,id)
 
 	case workflow.SendMenuReply:
 		if sender == nil {
