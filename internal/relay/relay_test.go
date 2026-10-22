@@ -108,7 +108,7 @@ func TestInvalidAndCapacityFailClosed(t *testing.T){
 func TestSpoolBytesQuota(t *testing.T){
 	dir:=t.TempDir()
 	maxBytes:=int64(4096)
-	bigBody:=[]byte(strings.Repeat("X",1600))
+	bigBody:=[]byte("\""+strings.Repeat("X",1598)+"\"")
 	store,err:=NewStoreWithLimits(dir,100,maxBytes)
 	if err!=nil{t.Fatal(err)}
 	first,_:=EventKey([]byte(evt1),"uuid-ads")
