@@ -34,7 +34,11 @@ func readAsset(envKey string) []byte {
 	if err != nil {
 		log.Fatalf("configured media file for %s is unavailable", envKey)
 	}
-	if len(b) == 0 || len(b) > 8<<20 {
+	limit := 8 << 20
+	if envKey == "BOT_ADS_DOCUMENT_FILE" {
+		limit = 25 << 20
+	}
+	if len(b) == 0 || len(b) > limit {
 		log.Fatalf("configured media file for %s has an invalid size", envKey)
 	}
 	return b
