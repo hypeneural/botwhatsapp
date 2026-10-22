@@ -19,6 +19,7 @@ ENV BOT_DATA_DIR=/var/lib/botwhatsapp/spool \
     TZ=America/Sao_Paulo
 WORKDIR /app
 COPY --from=builder /out/botwhatsapp /app/botwhatsapp
+COPY config/ /app/config/
 USER bot
 EXPOSE 8788
 ENTRYPOINT ["/app/botwhatsapp"]
