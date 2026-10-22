@@ -1,7 +1,7 @@
 # Fluxo Meta Ads e saudações — contrato do bot em 22/10/2026
 
 ## Evidência do anúncio inspecionado
-O relatório read-only do Antigravity informa que a instância GO `anderson`, conectada ao **48 3220-0440**, recebeu às 07h26 BRT um contato pelo Reel/CTWA Instagram. O texto completo é **"Quero conhecer os pacotes do Primeiro Natal em Tijucas"**, no campo `data.Message.extendedTextMessage.text`. O campo `Chat` traz JID telefônico `@s.whatsapp.net`; `SenderAlt` é `@lid`. `externalAdReply` e `referral` indicam a origem do anúncio, mas são metadados contextuais e NÃO são evidência criptográfica nem gatilho sozinho.
+O relatório read-only do Antigravity informa que a instância GO `anderson`, conectada ao **48 3220-0440**, recebeu às 07h26 BRT um contato pelo Reel/CTWA Instagram. Há dois textos completos comprovados no relatório fornecido: **"Quero conhecer os pacotes do Primeiro Natal em Tijucas"** (reel) e **"Quero conhecer os pacotes de Natal em Tijucas"** (imagem/carrossel), no campo `data.Message.extendedTextMessage.text`. O campo `Chat` traz JID telefônico `@s.whatsapp.net`; `SenderAlt` é `@lid`. `externalAdReply` e `referral` indicam a origem do anúncio, mas são metadados contextuais e NÃO são evidência criptográfica nem gatilho sozinho.
 
 **Esta auditoria leu o relatório enviado pelo usuário e o GitHub, não fez nova consulta ao banco da VPS.** IDs de mensagens, nomes/telefones de clientes, thumbnail, tokens do webhook e CTWA click IDs foram intencionalmente excluídos deste repositório. IMPORTANTE: o anexo original do relatório NÃO está totalmente sanitizado — contém campo `instanceToken` e outros campos sensíveis. Revisar/rotacionar credencial se estiver ativa e nunca versionar o JSON bruto.
 
@@ -20,7 +20,13 @@ O relatório read-only do Antigravity informa que a instância GO `anderson`, co
 7. Limite de corpo do webhook tanto no relay como no bot é **1 MiB**, pois JSON de CTWA pode carregar miniatura/referral. Nunca persistir esse JSON bruto desnecessariamente no journal do bot; relay somente guarda até encaminhar, em volume privado.
 
 ## Etapas e garantias
-O outbox grava o lote e cada dependência `PreviousTaskID`. O processador não executa etapa posterior enquanto anterior estiver pending/attempt_started; confirmed/uncertain/suppressed contam como término. Isso garante **ordem de tentativas/registro**, não exatamente-once físico em WhatsApp/CRM após falhas ambíguas. O CRM tem lead-claim diária por número + 416 + tenant (BRT). Um segundo clique do mesmo contato ainda pode gerar outro texto/áudio: avaliar política comercial de cooldown do funil antes de ativar tráfego alto; não afirmar deduplicação integral de TODOS os efeitos.
+O outbox grava o lote e cada dependência `PreviousTaskID`. O processador não executa etapa posterior enquanto anterior estiver pending/attempt_started; confirmed/uncertain/suppressed contam como término. Isso garante **ordem de tentativas/registro**, não exatamente-once físico em WhatsApp/CRM após falhas ambíguas. O CRM tem lead-claim diária por número + 416 + tenant (BRT). O worker agora marca duravelmente `LastAdsFlowAt` ao iniciar a primeira tentativa de texto; uma segunda sequência do mesmo contato dentro de `BOT_ADS_FLOW_COOLDOWN_HOURS` (1–168h, padrão 24h) tem o texto suprimido e as demais etapas em cascata suprimidas, inclusive CRM. Isso é uma janela **por contato no journal local** (não locks entre réplicas) e não garante exatamente-once físico. O lead claim CRM 416 continua como segunda proteção por dia BRT.
+
+## Limites de evidência do relatório de 50 eventos
+- Os 6 eventos CTWA entre os 50 webhooks são afirmações do relatório do Antigravity, não consultas diretas efetuadas nesta auditoria ao PostgreSQL da Contabo.
+- Duas mensagens no relatório trazem somente `@lid` e nenhum telefone confiável. O bot deve ignorar SEM tentar criar número da sequência LID; **não há garantia de que chegará outro webhook com JID telefônico**.
+- O relatório comprova eventos no motor de status, **não comprova que houve envio pela automação**, pois o webhook de produção estava vinculado ao status-engine e as flags de envio do bot estavam desativadas.
+- Não salvar PushName, número, identificadores Meta/CTWA nem tokens reais do relatório nos testes ou no Git.
 
 ## Configuração rápida
 - Edite `config/ads-triggers.txt` e inclua UMA FRASE COMPLETA por linha, sem as aspas. Comentários começam com `#`.
