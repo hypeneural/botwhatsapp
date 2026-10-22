@@ -107,15 +107,16 @@ func TestInvalidAndCapacityFailClosed(t *testing.T){
 
 func TestSpoolBytesQuota(t *testing.T){
 	dir:=t.TempDir()
-	maxBytes:=int64(len(evt1)+2048+32)
+	maxBytes:=int64(4096)
+	bigBody:=[]byte(strings.Repeat("X",1600))
 	store,err:=NewStoreWithLimits(dir,100,maxBytes)
 	if err!=nil{t.Fatal(err)}
 	first,_:=EventKey([]byte(evt1),"uuid-ads")
 	second,_:=EventKey([]byte(evt2),"uuid-ads")
-	if ok,err:=store.Insert(first,[]byte(evt1));err!=nil||!ok{t.Fatal("first insertion",err)}
-	if ok,err:=store.Insert(second,[]byte(evt2));ok||!errors.Is(err,ErrFull){t.Fatalf("missing byte backpressure: %t %v",ok,err)}
+	if ok,err:=store.Insert(first,bigBody);err!=nil||!ok{t.Fatal("first insertion",err)}
+	if ok,err:=store.Insert(second,bigBody);ok||!errors.Is(err,ErrFull){t.Fatalf("missing byte backpressure: %t %v",ok,err)}
 	fresh,err:=NewStoreWithLimits(dir,100,maxBytes)
 	if err!=nil{t.Fatal("restart quota count",err)}
-	if ok,err:=fresh.Insert(first,[]byte(evt1));ok||err!=nil{t.Fatal("existing ID should be idempotent under full quota",err)}
+	if ok,err:=fresh.Insert(first,bigBody);ok||err!=nil{t.Fatal("existing ID should be idempotent under full quota",err)}
 	if _,err:=NewStoreWithLimits(dir,100,4095);err==nil{t.Fatal("invalid quota accepted")}
 }
