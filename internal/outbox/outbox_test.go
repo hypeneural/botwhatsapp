@@ -281,6 +281,7 @@ func TestAudioFailureDoesNotBlockCRM(t *testing.T) {
 		DataDir:                  dir,
 		OperationalAuthorization: true,
 		CRMInstanceID:            &instanceID,
+		AdAudioFixture:           []byte("synthetic-audio-fixture"),
 	}
 
 	w, _ := NewWorker(cfg, store, evo, crmMock)
@@ -421,6 +422,7 @@ func TestHumanHandoffAndCooldown(t *testing.T) {
 	cfg := Config{
 		DataDir:          dir,
 		GreetingCooldown: 24 * time.Hour,
+		GreetingImageFixture: []byte("synthetic-image-fixture"),
 	}
 
 	w, _ := NewWorker(cfg, store, evo, crmMock)
