@@ -61,3 +61,14 @@ Não associar número ao UUID Evolution Go sem prova, nem UUID Evolution ao `mes
 - Para N instâncias, usar `internal/instances/registry.go` (ainda não conectado ao worker local), skill `multi-instance-contract`, claim GLOBAL por tenant/telefone nacional/campanha416/data BRT. Token e webhook secret exclusivos por instância.
 - `0.0.0.0:8788` abre escuta em todas interfaces do Windows; conexão via Tailscale não garante exclusividade da bind. Restringir interface/firewall conforme rede autorizada.
 - Não repetir um canário comercial só porque testes de dedup passaram. CRM id = agendamento; Evolution GO id = resposta API, não status delivered/read.
+
+## Prioridade de integração pós-canário — 22/10/2026
+- A PR #4 contém a consolidação do worker real, registry e contrato CRM 416; esta nova branch de correções é empilhada **sobre PR #4**, não sobre `main`.
+- Leia `docs/FORENSIC-PR4-20261022.md`, `docs/PROMPT-ANTIGRAVITY-PR4-GUARDS.md` e `.agents/skills/outbox-production-audit/SKILL.md` antes de efetuar merge ou testar.
+- Risco crítico corrigido: não enviar HTTP 202 de webhook antes de persistir TODAS as tarefas do outbox. `CommitEventTasks` grava lote com fsync e marca evento ao final.
+- `BOT_OUTBOUND_ENABLED` e `BOT_OPERATIONAL_AUTHORIZATION` começam false. Exigir URL Evolution Go, token CRM e token por instância explícitos; nenhum áudio/imagem placeholder pode sair.
+- Opt-out PARAR, pausa humana e cooldown são salvaguardas persistentes; falha em leitura do estado do contato é bloqueio de envio, não novo contato.
+- Um único bot/worker/réplica deve possuir o `BOT_DATA_DIR`. Não montar o mesmo journal gravável em dois processos e assumir transação distribuída.
+- Manutenção periódica só trata tarefas concluídas; retenção de ingress spool, locks de events/leads, contatos e uncertain NÃO está resolvida.
+- O webhook `anderson` segue reservado ao motor de status. Implementar relay/fan-out autorizado em trabalho separado ANTES de deploy. Nenhuma mudança operational nesta PR.
+- Não repetir o teste CRM de campanha 416 para atestar a API; canário anterior foi relatado e busca GET ficou inconclusiva.

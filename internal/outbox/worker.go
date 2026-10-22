@@ -8,6 +8,7 @@ import (
 
 	"github.com/hypeneural/botwhatsapp/internal/core"
 	"github.com/hypeneural/botwhatsapp/internal/crm"
+	"github.com/hypeneural/botwhatsapp/internal/instances"
 	"github.com/hypeneural/botwhatsapp/internal/workflow"
 )
 
@@ -32,12 +33,6 @@ func NewWorker(cfg Config, store *Store, evolution EvolutionSender, crmScheduler
 	}
 	if cfg.GreetingCaption == "" {
 		cfg.GreetingCaption = "Olá! Seja bem-vindo ao Estúdio Evidência. Escolha uma das opções abaixo para continuarmos:\n1. Natal 2026\n2. Agendamentos\n3. Fotos e pedidos\n4. Localização\n5. Falar com atendente humano"
-	}
-	if len(cfg.AdAudioFixture) == 0 {
-		cfg.AdAudioFixture = []byte("MOCK_AUDIO_FIXTURE_BYTES")
-	}
-	if len(cfg.GreetingImageFixture) == 0 {
-		cfg.GreetingImageFixture = []byte("MOCK_IMAGE_FIXTURE_BYTES")
 	}
 	if cfg.Tenant == "" {
 		cfg.Tenant = "estudio-evydencia"
@@ -79,8 +74,8 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 			if err == nil {
 				c.OptOut = true
 				c.OptOutAt = time.Now().UTC()
-				_ = w.store.SaveContact(c)
-			}
+				if err := w.store.SaveContact(c); err != nil {return err}
+			} else { return err }
 		}
 		return nil
 	}
@@ -89,16 +84,8 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 		return nil
 	}
 
-	// 2. Check event deduplication
-	isNew, err := w.store.CheckAndRecordEvent(d.InstanceID, "Message", d.MessageID)
-	if err != nil {
-		return fmt.Errorf("outbox: dedup check failed: %w", err)
-	}
-	if !isNew {
-		// Event was already processed
-		return ErrEventDuplicate
-	}
-
+	// Check contact policy before publishing a durable event marker.
+	// The marker is committed LAST, only after all workflow tasks are durable.
 	// 3. Check contact suppression (opt-out and human paused)
 	contact, err := w.store.GetContact(d.PhoneE164)
 	if err != nil {
@@ -123,17 +110,27 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 		}
 	}
 
+	// Commit human takeover synchronously with ingress. A queued greeting
+	// or CRM attempt may no longer start after the customer asks for a person.
+	if d.Action == core.MenuOption && d.Option == "5" {
+		contact.HumanPaused = true
+		contact.HumanPausedAt = time.Now().UTC()
+		if err := w.store.SaveContact(contact); err != nil { return err }
+	}
 	// 5. Create workflow plan and enqueue tasks
 	plan := workflow.Create(d)
 	if len(plan.Steps) == 0 {
 		return nil
 	}
 
+	eventKey, err := instances.EventKey(d.InstanceID, "Message", d.MessageID)
+	if err != nil {return err}
+	tasks := make([]Task, 0, len(plan.Steps))
 	for idx, step := range plan.Steps {
-		taskID := fmt.Sprintf("%d-%02d-%s-%s", time.Now().UTC().UnixNano(), idx, step, d.MessageID)
+		taskID := fmt.Sprintf("%s-%02d-%s", eventKey, idx, step)
 		task := Task{
 			ID:           taskID,
-			EventKey:     d.MessageID,
+			EventKey:     eventKey,
 			InstanceID:   d.InstanceID,
 			RecipientJID: d.ReplyJID,
 			PhoneE164:    d.PhoneE164,
@@ -141,6 +138,7 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 			ContactName:  d.Name,
 			Step:         step,
 			State:        TaskPending,
+			AllowOnHumanPause: d.Action == core.MenuOption && d.Option == "5" && step == workflow.SendMenuReply,
 			CreatedAt:    time.Now().UTC(),
 		}
 
@@ -153,17 +151,17 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 			task.PayloadText = plan.Message
 		}
 
-		if err := w.store.EnqueueTask(task); err != nil {
-			return fmt.Errorf("outbox: failed to enqueue task %s: %w", taskID, err)
-		}
-
-		// Non-blocking feed into worker channel
-		select {
-		case w.taskCh <- task:
-		default:
-		}
+		tasks = append(tasks, task)
 	}
-
+	// Commit all tasks and the dedup marker in one serialized disk operation.
+	// On failure, the marker is not committed so the webhook can retry safely.
+	isNew, err := w.store.CommitEventTasks(d.InstanceID, "Message", d.MessageID, tasks)
+	if err != nil { return fmt.Errorf("outbox: cannot commit event tasks: %w", err) }
+	if !isNew { return ErrEventDuplicate }
+	// Prompt processing immediately; a full queue never drops the durable task.
+	for _, task := range tasks {
+		select { case w.taskCh <- task: default: }
+	}
 	return nil
 }
 
@@ -182,16 +180,30 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 
 	// Check contact opt-out once more before starting attempt
 	contact, err := w.store.GetContact(task.PhoneE164)
-	if err == nil && contact.OptOut {
-		_, _ = w.store.UpdateTaskState(task.ID, func(t *Task) error {
+	if err != nil { return fmt.Errorf("outbox: cannot read contact policy: %w", err) }
+	if contact.OptOut || (contact.HumanPaused && task.Step != workflow.PauseHuman && !task.AllowOnHumanPause) {
+		_, err = w.store.UpdateTaskState(task.ID, func(t *Task) error {
 			t.State = TaskSuppressed
-			t.Error = "suppressed: contact opted out"
+			t.Error = "suppressed: contact policy (opt-out or human handoff)"
 			t.CompletedAt = time.Now().UTC()
 			return nil
 		})
-		return nil
+		return err
 	}
 
+	// Last defense against multiple greetings queued before the first image
+	// was actually sent (ingress cooldown alone is insufficient).
+	if task.Step == workflow.SendGreetingImage && !workflow.IsGreetingDue(
+		contact.LastGreetingAt,time.Now().UTC(),w.cfg.GreetingCooldown,contact.HumanPaused) {
+		return w.recordSuppressed(task.ID,"greeting cooldown not elapsed at send time")
+	}
+	// Do not transmit fake/missing media; suppress BEFORE attempt_started.
+	if task.Step == workflow.SendAdAudio && len(w.cfg.AdAudioFixture) == 0 {
+		return w.recordSuppressed(task.ID, "audio asset missing: no outbound request attempted")
+	}
+	if task.Step == workflow.SendGreetingImage && len(w.cfg.GreetingImageFixture) == 0 {
+		return w.recordSuppressed(task.ID, "greeting image asset missing: no outbound request attempted")
+	}
 	// Transition ATOMICALLY to attempt_started with fsync before issuing outbound call
 	task, err = w.store.UpdateTaskState(task.ID, func(t *Task) error {
 		t.State = TaskAttemptStarted
@@ -202,24 +214,30 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 		return fmt.Errorf("outbox: failed to record attempt_started: %w", err)
 	}
 
+	// Sender routing is strict when multiple instances are configured.
+	// Missing sender means suppress/fail closed, never use another account's key.
+	sender := w.evolution
+	if len(w.cfg.Senders) != 0 {
+		sender = w.cfg.Senders[task.InstanceID]
+	}
 	// Execute specific step effect
 	switch task.Step {
 	case workflow.SendAdText:
-		if w.evolution == nil {
+		if sender == nil {
 			return w.recordUncertain(task.ID, "evolution sender not configured")
 		}
-		extID, err := w.evolution.SendText(ctx, task.RecipientJID, task.PayloadText)
+		extID, err := sender.SendText(ctx, task.RecipientJID, task.PayloadText)
 		if err != nil {
 			return w.recordUncertain(task.ID, err.Error())
 		}
 		return w.recordConfirmed(task.ID, extID)
 
 	case workflow.SendAdAudio:
-		if w.evolution == nil {
+		if sender == nil {
 			return w.recordUncertain(task.ID, "evolution sender not configured")
 		}
 		// SendMedia with type="audio" produces AudioMessage with PTT: true in Evolution Go 0.7.2
-		extID, err := w.evolution.SendMedia(ctx, task.RecipientJID, "audio", w.cfg.AdAudioFixture, "")
+		extID, err := sender.SendMedia(ctx, task.RecipientJID, "audio", w.cfg.AdAudioFixture, "")
 		if err != nil {
 			// Note: Failure or timeout in audio does NOT block subsequent steps (like CRM)
 			return w.recordUncertain(task.ID, err.Error())
@@ -230,23 +248,26 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 		return w.executeScheduleNatal(ctx, task)
 
 	case workflow.SendGreetingImage:
-		if w.evolution == nil {
+		if sender == nil {
 			return w.recordUncertain(task.ID, "evolution sender not configured")
 		}
-		extID, err := w.evolution.SendMedia(ctx, task.RecipientJID, "image", w.cfg.GreetingImageFixture, task.PayloadCaption)
+		extID, err := sender.SendMedia(ctx, task.RecipientJID, "image", w.cfg.GreetingImageFixture, task.PayloadCaption)
 		if err != nil {
 			return w.recordUncertain(task.ID, err.Error())
 		}
 		// Record successful greeting timestamp on contact
 		contact.LastGreetingAt = time.Now().UTC()
-		_ = w.store.SaveContact(contact)
+		if err := w.store.SaveContact(contact); err != nil {
+			// Media was already sent; do not retry on contact state persistence failure.
+			return w.recordUncertain(task.ID, "greeting sent; contact cooldown persistence failed")
+		}
 		return w.recordConfirmed(task.ID, extID)
 
 	case workflow.SendMenuReply:
-		if w.evolution == nil {
+		if sender == nil {
 			return w.recordUncertain(task.ID, "evolution sender not configured")
 		}
-		extID, err := w.evolution.SendText(ctx, task.RecipientJID, task.PayloadText)
+		extID, err := sender.SendText(ctx, task.RecipientJID, task.PayloadText)
 		if err != nil {
 			return w.recordUncertain(task.ID, err.Error())
 		}
@@ -255,7 +276,9 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 	case workflow.PauseHuman:
 		contact.HumanPaused = true
 		contact.HumanPausedAt = time.Now().UTC()
-		_ = w.store.SaveContact(contact)
+		if err := w.store.SaveContact(contact); err != nil {
+			return w.recordUncertain(task.ID, "human pause persistence failed")
+		}
 		return w.recordConfirmed(task.ID, "internal-pause-applied")
 
 	default:
@@ -359,4 +382,15 @@ func (w *Worker) DrainPending(ctx context.Context) (int, error) {
 	}
 
 	return count, nil
+}
+
+
+// PendingTasks is only an optimization. Durable storage and periodic recovery
+// remain authoritative if the bounded queue is full or the process restarts.
+func (w *Worker) PendingTasks() <-chan Task { return w.taskCh }
+
+// PruneCompleted is explicit and never removes pending or uncertain tasks.
+// Invoke on a low-frequency maintenance schedule, not on every webhook.
+func (w *Worker) PruneCompleted() (int,error) {
+	return w.store.PruneOldTasks(w.cfg.TaskRetention,w.cfg.MaxTasksCount)
 }

@@ -25,7 +25,7 @@ type Settings struct {
 	GreetingSecret string
 	Core           core.Config
 	SpoolDir       string
-	OnDecision     func(core.Decision)
+	OnDecision     func(core.Decision) error
 	Registry       *instances.Registry
 	Secrets        map[string]string // Slug -> Secret
 }
@@ -186,13 +186,39 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if decision.Action == core.Ignore {
-		w.WriteHeader(204)
+		// Opt-out is an actionable control event, never silently drop it.
+		if decision.Reason == "opt_out_requires_persistent_suppression" && s.settings.OnDecision != nil {
+			if err := s.settings.OnDecision(decision); err != nil {
+				http.Error(w, "durable suppression unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
 	// Stable key for idempotency. Do not embed numbers/names in filenames.
 	key := sha256.Sum256([]byte(uuid + "\x00" + "Message" + "\x00" + msgID))
 	name := hex.EncodeToString(key[:]) + ".json"
+	journalPath := filepath.Join(s.settings.SpoolDir, name)
+	if _, err := os.Stat(journalPath); err == nil {
+		// Previously ACKed and durably accepted by both the outbox and spool.
+		w.WriteHeader(http.StatusAccepted)
+		return
+	} else if !os.IsNotExist(err) {
+		http.Error(w, "spool unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	// Persist outbox tasks BEFORE acknowledging the webhook. Never detach this
+	// operation into a goroutine; a crash could otherwise lose an ACKed event.
+	if s.settings.OnDecision != nil {
+		if err := s.settings.OnDecision(decision); err != nil {
+			http.Error(w, "durable outbox unavailable", http.StatusServiceUnavailable)
+			return
+		}
+	}
 
 	// Atomic: only expose a fully written record. Hard link refuses overwrite.
 	tmp, err := os.CreateTemp(s.settings.SpoolDir, ".tmp-*")
@@ -223,7 +249,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "spool unavailable", 503)
 		return
 	}
-	err = os.Link(tmp.Name(), filepath.Join(s.settings.SpoolDir, name))
+	err = os.Link(tmp.Name(), journalPath)
 	if os.IsExist(err) {
 		w.WriteHeader(202)
 		return
@@ -236,9 +262,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if d, err := os.Open(s.settings.SpoolDir); err == nil {
 		_ = d.Sync()
 		_ = d.Close()
-	}
-	if s.settings.OnDecision != nil {
-		go s.settings.OnDecision(decision)
 	}
 	w.WriteHeader(202)
 }
