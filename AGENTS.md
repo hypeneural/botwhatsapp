@@ -52,3 +52,12 @@ Não associar número ao UUID Evolution Go sem prova, nem UUID Evolution ao `mes
 - Cliente CRM `internal/crm/client.go`: instância de saída numérica >0, HTTPS para endereço não-local, token raw `Authorization`, `type:campaign`, `use_leads_system:false`. Nunca escrever no CRM.
 - API Evolution Go `internal/evolution/client.go`: `Status`, `SendTextWithID`, `SendMediaWithID`; ler `docs/EVOLUTION-GO-API-FUNCTIONS.md`. Não reutilizar token CRM na Evolution Go.
 - Como AntiGravity pode trabalhar na main simultaneamente, as alterações deste ciclo foram isoladas em `feat/crm-416-contract-20261021`. Integrar por PR após validação de conflitos.\n
+## Canário real relatado — verificação obrigatória antes de produção
+- Consulte `docs/AUDIT-CANARY-AND-MULTIINSTANCE-2026-10-21.md` e `docs/HANDOFF-ANTIGRAVITY-CANARY.md` antes de retomar execuções.
+- Os commits do canário `16514e4`, `10348a6`, `ae40f97` foram relatados como locais no Windows; não foram encontrados em `main` remota na auditoria. Auditar o código EFETIVAMENTE usado quando estiver publicado.
+- O relatório do canário informa rota CRM `/api/campaigns/schedule`, mas o código CRM define `POST /api/campaigns/schedule/execute`. Nunca presumir que agendamento foi feito por rota incorreta.
+- A instância `anderson` está/estava vinculada a um webhook de status. **Não substituir esse webhook para testes ou produção** antes de plano de fan-out durável e autorização.
+- Snapshot UI de webhook restaurado não comprova persistência nem processamento; confirmar por leitura técnica sem alterar config.
+- Para N instâncias, usar `internal/instances/registry.go` (ainda não conectado ao worker local), skill `multi-instance-contract`, claim GLOBAL por tenant/telefone nacional/campanha416/data BRT. Token e webhook secret exclusivos por instância.
+- `0.0.0.0:8788` abre escuta em todas interfaces do Windows; conexão via Tailscale não garante exclusividade da bind. Restringir interface/firewall conforme rede autorizada.
+- Não repetir um canário comercial só porque testes de dedup passaram. CRM id = agendamento; Evolution GO id = resposta API, não status delivered/read.

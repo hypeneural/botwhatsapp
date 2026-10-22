@@ -52,8 +52,16 @@ func (s *Server) ServeHTTP(w http.ResponseWriter,r *http.Request) {
  default: http.Error(w,"not found",404);return
  }
  if !s.settings.Enabled {http.Error(w,"service disabled",503);return}
- secret:=r.URL.Path[strings.LastIndex(r.URL.Path,"/")+1:]
- if subtle.ConstantTimeCompare([]byte(secret),[]byte(expected))!=1 || secret=="" {
+ // Enforce exactly one final path segment. Previously an attacker could
+ // append /extra/<valid-secret> and still pass the last-segment comparison.
+ prefix:="/webhook/ads/"
+ if uuid==s.settings.Core.GreetingUUID {prefix="/webhook/greeting/"}
+ if !strings.HasPrefix(r.URL.Path,prefix) {
+  http.Error(w,"unauthorized",401);return
+ }
+ secret:=strings.TrimPrefix(r.URL.Path,prefix)
+ if secret=="" || strings.Contains(secret,"/") || strings.Contains(secret,"\\") ||
+  subtle.ConstantTimeCompare([]byte(secret),[]byte(expected))!=1 {
   http.Error(w,"unauthorized",401);return
  }
  r.Body=http.MaxBytesReader(w,r.Body,65536)
