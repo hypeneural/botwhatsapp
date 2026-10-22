@@ -1,0 +1,19 @@
+# The relay is OPTIONAL and disabled until explicitly configured.
+FROM golang:1.27.3-alpine3.24 AS builder
+WORKDIR /src
+COPY go.mod ./
+COPY cmd/webhook-relay/ ./cmd/webhook-relay/
+COPY internal/relay/ ./internal/relay/
+RUN CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags="-s -w" -o /out/webhook-relay ./cmd/webhook-relay
+
+FROM alpine:3.24.2
+RUN apk add --no-cache ca-certificates \
+    && addgroup -S relay && adduser -S -G relay relay \
+    && mkdir -p /var/lib/botwhatsapp-relay/spool \
+    && chown -R relay:relay /var/lib/botwhatsapp-relay
+ENV RELAY_DATA_DIR=/var/lib/botwhatsapp-relay/spool
+WORKDIR /app
+COPY --from=builder /out/webhook-relay /app/webhook-relay
+USER relay
+EXPOSE 8789
+ENTRYPOINT ["/app/webhook-relay"]
