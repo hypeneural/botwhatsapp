@@ -2,6 +2,7 @@ package outbox
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -11,6 +12,8 @@ import (
 	"github.com/hypeneural/botwhatsapp/internal/instances"
 	"github.com/hypeneural/botwhatsapp/internal/workflow"
 )
+
+var errAdsCooldown = errors.New("ads workflow already started within cooldown")
 
 type Worker struct {
 	cfg       Config
@@ -28,6 +31,7 @@ func NewWorker(cfg Config, store *Store, evolution EvolutionSender, crmScheduler
 	if cfg.GreetingCooldown <= 0 {
 		cfg.GreetingCooldown = 24 * time.Hour
 	}
+	if cfg.AdsFlowCooldown <= 0 {cfg.AdsFlowCooldown=24*time.Hour}
 	if cfg.AdWelcomeText == "" {
 		cfg.AdWelcomeText = "Oii! Tudo bem? 🎄❤️ Que alegria receber seu contato! Vamos enviar a proposta de Natal 2026 por outro WhatsApp oficial do Estúdio Evidência."
 	}
@@ -68,16 +72,12 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 	defer w.mu.Unlock()
 
 	// 1. If reason is opt-out suppression, record it immediately and stop.
-	if d.Reason == "opt_out_requires_persistent_suppression" {
-		if d.PhoneE164 != "" {
-			c, err := w.store.GetContact(d.PhoneE164)
-			if err == nil {
-				c.OptOut = true
-				c.OptOutAt = time.Now().UTC()
-				if err := w.store.SaveContact(c); err != nil {return err}
-			} else { return err }
-		}
-		return nil
+	if d.Reason=="opt_out_requires_persistent_suppression" {
+		if d.PhoneE164=="" {return errors.New("outbox: opt-out without telephone")}
+		_,err:=w.store.UpdateContact(d.PhoneE164,func(c *ContactState)error{
+			c.OptOut=true;c.OptOutAt=time.Now().UTC();return nil
+		})
+		return err
 	}
 
 	if d.Action == core.Ignore {
@@ -113,9 +113,9 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 	// Commit human takeover synchronously with ingress. A queued greeting
 	// or CRM attempt may no longer start after the customer asks for a person.
 	if d.Action == core.MenuOption && d.Option == "5" {
-		contact.HumanPaused = true
-		contact.HumanPausedAt = time.Now().UTC()
-		if err := w.store.SaveContact(contact); err != nil { return err }
+		if _,err:=w.store.UpdateContact(d.PhoneE164,func(c *ContactState)error{
+			c.HumanPaused=true;c.HumanPausedAt=time.Now().UTC();return nil
+		});err!=nil{return err}
 	}
 	// 5. Create workflow plan and enqueue tasks
 	plan := workflow.CreateWithOptions(d,workflow.Options{
@@ -196,6 +196,13 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 		prev,err:=w.store.GetTask(task.PreviousTaskID)
 		if err!=nil {return fmt.Errorf("outbox: preceding task missing/unreadable: %w",err)}
 		if prev.State==TaskPending || prev.State==TaskAttemptStarted {return nil}
+		// When the opening text of an ad was suppressed for cooldown,
+		// the remaining audio/visual/CRM stages from THAT duplicate event
+		// must also be suppressed, not merely wait for the daily CRM claim.
+		if prev.State==TaskSuppressed && (prev.Error=="ads flow cooldown" ||
+			prev.Error=="ads flow cooldown cascade") {
+			return w.recordSuppressed(task.ID,"ads flow cooldown cascade")
+		}
 	}
 
 	// Check contact opt-out once more before starting attempt
@@ -240,6 +247,20 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 		return fmt.Errorf("outbox: failed to record attempt_started: %w", err)
 	}
 
+	// Claim the entire ad workflow on the FIRST text step before any network
+	// request. An ambiguous timeout counts as an attempt to avoid flooding
+	// the same customer with a second full marketing sequence.
+	if task.Step==workflow.SendAdText {
+		_,err:=w.store.UpdateContact(task.PhoneE164,func(c *ContactState)error{
+			if c.OptOut||c.HumanPaused {return errors.New("contact is now suppressed")}
+			if !c.LastAdsFlowAt.IsZero() && time.Since(c.LastAdsFlowAt)<w.cfg.AdsFlowCooldown {
+				return errAdsCooldown
+			}
+			c.LastAdsFlowAt=time.Now().UTC();return nil
+		})
+		if errors.Is(err,errAdsCooldown) {return w.recordSuppressed(task.ID,"ads flow cooldown")}
+		if err!=nil{return w.recordUncertain(task.ID,"ads cooldown/contact policy persistence unavailable")}
+	}
 	// Sender routing is strict when multiple instances are configured.
 	// Missing sender means suppress/fail closed, never use another account's key.
 	sender := w.evolution
@@ -292,8 +313,9 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 			return w.recordUncertain(task.ID, err.Error())
 		}
 		// Record successful greeting timestamp on contact
-		contact.LastGreetingAt = time.Now().UTC()
-		if err := w.store.SaveContact(contact); err != nil {
+		if _,err:=w.store.UpdateContact(task.PhoneE164,func(c *ContactState)error{
+			c.LastGreetingAt=time.Now().UTC();return nil
+		});err!=nil{
 			// Media was already sent; do not retry on contact state persistence failure.
 			return w.recordUncertain(task.ID, "greeting sent; contact cooldown persistence failed")
 		}
@@ -304,8 +326,9 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 		if sender==nil{return w.recordUncertain(task.ID,"evolution sender not configured")}
 		id,err:=sender.SendText(ctx,task.RecipientJID,task.PayloadText)
 		if err!=nil{return w.recordUncertain(task.ID,err.Error())}
-		contact.LastGreetingAt=time.Now().UTC()
-		if err:=w.store.SaveContact(contact);err!=nil{
+		if _,err:=w.store.UpdateContact(task.PhoneE164,func(c *ContactState)error{
+			c.LastGreetingAt=time.Now().UTC();return nil
+		});err!=nil{
 			return w.recordUncertain(task.ID,"text greeting sent; cooldown persistence failed")
 		}
 		return w.recordConfirmed(task.ID,id)
@@ -321,9 +344,9 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 		return w.recordConfirmed(task.ID, extID)
 
 	case workflow.PauseHuman:
-		contact.HumanPaused = true
-		contact.HumanPausedAt = time.Now().UTC()
-		if err := w.store.SaveContact(contact); err != nil {
+		if _,err:=w.store.UpdateContact(task.PhoneE164,func(c *ContactState)error{
+			c.HumanPaused=true;c.HumanPausedAt=time.Now().UTC();return nil
+		});err!=nil{
 			return w.recordUncertain(task.ID, "human pause persistence failed")
 		}
 		return w.recordConfirmed(task.ID, "internal-pause-applied")
