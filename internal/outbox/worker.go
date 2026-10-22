@@ -8,6 +8,7 @@ import (
 
 	"github.com/hypeneural/botwhatsapp/internal/core"
 	"github.com/hypeneural/botwhatsapp/internal/crm"
+	"github.com/hypeneural/botwhatsapp/internal/instances"
 	"github.com/hypeneural/botwhatsapp/internal/workflow"
 )
 
@@ -83,16 +84,8 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 		return nil
 	}
 
-	// 2. Check event deduplication
-	isNew, err := w.store.CheckAndRecordEvent(d.InstanceID, "Message", d.MessageID)
-	if err != nil {
-		return fmt.Errorf("outbox: dedup check failed: %w", err)
-	}
-	if !isNew {
-		// Event was already processed
-		return ErrEventDuplicate
-	}
-
+	// Check contact policy before publishing a durable event marker.
+	// The marker is committed LAST, only after all workflow tasks are durable.
 	// 3. Check contact suppression (opt-out and human paused)
 	contact, err := w.store.GetContact(d.PhoneE164)
 	if err != nil {
@@ -123,11 +116,14 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 		return nil
 	}
 
+	eventKey, err := instances.EventKey(d.InstanceID, "Message", d.MessageID)
+	if err != nil {return err}
+	tasks := make([]Task, 0, len(plan.Steps))
 	for idx, step := range plan.Steps {
-		taskID := fmt.Sprintf("%d-%02d-%s-%s", time.Now().UTC().UnixNano(), idx, step, d.MessageID)
+		taskID := fmt.Sprintf("%s-%02d-%s", eventKey, idx, step)
 		task := Task{
 			ID:           taskID,
-			EventKey:     d.MessageID,
+			EventKey:     eventKey,
 			InstanceID:   d.InstanceID,
 			RecipientJID: d.ReplyJID,
 			PhoneE164:    d.PhoneE164,
@@ -147,17 +143,13 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 			task.PayloadText = plan.Message
 		}
 
-		if err := w.store.EnqueueTask(task); err != nil {
-			return fmt.Errorf("outbox: failed to enqueue task %s: %w", taskID, err)
-		}
-
-		// Non-blocking feed into worker channel
-		select {
-		case w.taskCh <- task:
-		default:
-		}
+		tasks = append(tasks, task)
 	}
-
+	// Commit all tasks and the dedup marker in one serialized disk operation.
+	// On failure, the marker is not committed so the webhook can retry safely.
+	isNew, err := w.store.CommitEventTasks(d.InstanceID, "Message", d.MessageID, tasks)
+	if err != nil { return fmt.Errorf("outbox: cannot commit event tasks: %w", err) }
+	if !isNew { return ErrEventDuplicate }
 	return nil
 }
 
