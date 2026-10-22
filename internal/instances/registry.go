@@ -27,7 +27,66 @@ var (
  ErrInvalidClaim = errors.New("instances: invalid lead claim")
  slugRE = regexp.MustCompile(`^[a-z][a-z0-9_-]{1,39}$`)
  phoneRE = regexp.MustCompile(`^55[0-9]{10,11}$`)
- nationalRE = regexp.MustCompile(`^[0-9]{10,11}$`)
+ nationalRE = regexp.MustCompile(`^[0-9]{10,11}// Package instances is a pure configuration registry for multiple Evolution Go
+// instances. It performs no I/O and never connects or changes WhatsApp sessions.
+package instances
+
+import (
+ "crypto/sha256"
+ "crypto/subtle"
+ "encoding/hex"
+ "errors"
+ "fmt"
+ "regexp"
+ "strings"
+ "time"
+
+ "github.com/hypeneural/botwhatsapp/internal/core"
+)
+
+type Role string
+const (
+ Ads Role = "ads"
+ Greeting Role = "greeting"
+ Observe Role = "observe"
+)
+var (
+ ErrInvalid = errors.New("instances: invalid configuration")
+ ErrUnknown = errors.New("instances: unknown or disabled instance")
+ ErrInvalidClaim = errors.New("instances: invalid lead claim")
+ slugRE = regexp.MustCompile(`^[a-z][a-z0-9_-]{1,39}$`)
+ phoneRE = regexp.MustCompile(`^55[0-9]{10,11}$`)
+)
+ envRE = regexp.MustCompile(`^[A-Z][A-Z0-9_]{2,79}// Package instances is a pure configuration registry for multiple Evolution Go
+// instances. It performs no I/O and never connects or changes WhatsApp sessions.
+package instances
+
+import (
+ "crypto/sha256"
+ "crypto/subtle"
+ "encoding/hex"
+ "errors"
+ "fmt"
+ "regexp"
+ "strings"
+ "time"
+
+ "github.com/hypeneural/botwhatsapp/internal/core"
+)
+
+type Role string
+const (
+ Ads Role = "ads"
+ Greeting Role = "greeting"
+ Observe Role = "observe"
+)
+var (
+ ErrInvalid = errors.New("instances: invalid configuration")
+ ErrUnknown = errors.New("instances: unknown or disabled instance")
+ ErrInvalidClaim = errors.New("instances: invalid lead claim")
+ slugRE = regexp.MustCompile(`^[a-z][a-z0-9_-]{1,39}$`)
+ phoneRE = regexp.MustCompile(`^55[0-9]{10,11}$`)
+)
 )
 type Definition struct {
  Slug string
@@ -62,8 +121,13 @@ func New(defs []Definition)(*Registry,error){
    strings.TrimSpace(d.InstanceUUID)!=d.InstanceUUID{
    return nil,fmt.Errorf("%w: invalid phone or UUID",ErrInvalid)
   }
-  if d.Enabled && (d.TokenEnv==""||d.WebhookSecretEnv==""){
-   return nil,fmt.Errorf("%w: enabled instance missing token/secret ENV names",ErrInvalid)
+  if d.Enabled && (!envRE.MatchString(d.TokenEnv) || !envRE.MatchString(d.WebhookSecretEnv) ||
+   d.TokenEnv==d.WebhookSecretEnv) {
+   return nil,fmt.Errorf("%w: enabled instance needs distinct ENV variable names, not secret values",ErrInvalid)
+  }
+  if d.TokenEnv!="" && !envRE.MatchString(d.TokenEnv) ||
+   d.WebhookSecretEnv!="" && !envRE.MatchString(d.WebhookSecretEnv){
+   return nil,fmt.Errorf("%w: invalid ENV variable identifier",ErrInvalid)
   }
   if d.Role==Ads && d.Enabled && len(d.AdsTriggers)==0{
    return nil,fmt.Errorf("%w: ads role requires explicit triggers",ErrInvalid)
