@@ -37,16 +37,31 @@ type Store struct {
 	dir string
 	max int
 	count int
+	maxBytes int64
+	usedBytes int64
 }
 
 func NewStore(dir string, max int) (*Store,error) {
-	if dir=="" || max<=0 {return nil,errors.New("relay: invalid spool directory/capacity")}
+	return NewStoreWithLimits(dir,max,128<<20)
+}
+// NewStoreWithLimits enforces BOTH a maximum event count and a maximum spool
+// disk budget. No unacknowledged event is silently purged to make room.
+func NewStoreWithLimits(dir string,max int,maxBytes int64)(*Store,error){
+	if dir=="" || max<=0 || maxBytes<4096 {return nil,errors.New("relay: invalid spool directory/capacity")}
 	if err:=os.MkdirAll(dir,0700);err!=nil{return nil,err}
 	entries,err:=os.ReadDir(dir)
 	if err!=nil{return nil,err}
 	n:=0
-	for _,e:=range entries {if !e.IsDir()&&strings.HasSuffix(e.Name(),".json"){n++}}
-	return &Store{dir:dir,max:max,count:n},nil
+	var bytesUsed int64
+	for _,e:=range entries {
+		if !e.IsDir()&&strings.HasSuffix(e.Name(),".json"){
+			info,err:=e.Info()
+			if err!=nil{return nil,err}
+			n++;bytesUsed+=info.Size()
+		}
+	}
+	if n>max||bytesUsed>maxBytes{return nil,ErrFull}
+	return &Store{dir:dir,max:max,count:n,maxBytes:maxBytes,usedBytes:bytesUsed},nil
 }
 
 func EventKey(body []byte, expectedUUID string)(string,error){
@@ -88,7 +103,10 @@ func (s *Store) write(rec Record)error{
 	if _,err=f.Write(raw);err!=nil{f.Close();return err}
 	if err=f.Sync();err!=nil{f.Close();return err}
 	if err=f.Close();err!=nil{return err}
+	var priorSize int64
+	if old,err:=os.Stat(path);err==nil{priorSize=old.Size()}else if !os.IsNotExist(err){return err}
 	if err=os.Rename(f.Name(),path);err!=nil{return err}
+	s.usedBytes+=int64(len(raw))-priorSize
 	if runtime.GOOS!="windows" {
 		d,err:=os.Open(s.dir)
 		if err!=nil{return err}
@@ -104,7 +122,9 @@ func (s *Store) Insert(key string,body []byte)(bool,error){
 	path,err:=s.path(key)
 	if err!=nil{return false,err}
 	if _,err:=os.Stat(path);err==nil{return false,nil}else if !os.IsNotExist(err){return false,err}
-	if s.count>=s.max{return false,ErrFull}
+	// Reserve headroom for status flags/timestamps as the event progresses.
+	// Store.write keeps usedBytes accurate as records shrink after delivery.
+	if s.count>=s.max||s.usedBytes+int64(len(body))+2048>s.maxBytes{return false,ErrFull}
 	rec:=Record{Key:key,Body:append([]byte(nil),body...),CreatedAt:time.Now().UTC()}
 	if err:=s.write(rec);err!=nil{return false,err}
 	s.count++
@@ -168,8 +188,9 @@ func(s *Store) PruneCompleted(before time.Time)(int,error){
 		var r Record
 		if err:=json.Unmarshal(b,&r);err!=nil{return n,err}
 		if !r.CompletedAt.IsZero()&&r.CompletedAt.Before(before)&&len(r.Body)==0{
+			info,err:=os.Stat(path);if err!=nil{return n,err}
 			if err:=os.Remove(path);err!=nil{return n,err}
-			s.count--;n++
+			s.count--;s.usedBytes-=info.Size();n++
 		}
 	}
 	return n,nil
