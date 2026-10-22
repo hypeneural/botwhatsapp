@@ -6,6 +6,8 @@ on:
       - 'Dockerfile'
       - 'cmd/**'
       - 'internal/**'
+      - 'config/**'
+      - 'testdata/**'
       - '.github/workflows/go-test.yml'
   pull_request:
     paths:
