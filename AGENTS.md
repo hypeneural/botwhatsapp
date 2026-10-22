@@ -34,9 +34,9 @@ O script NÃO acessa VPS, não executa `docker compose up/down` nem chama APIs r
 
 ## Fluxo CTWA (prioridade do ciclo atual)
 - Revise `docs/CTWA-ROUTING-20261022.md` e a skill `.agents/skills/ctwa-ads-funnel/SKILL.md`. Payload da conversa de tráfego pago foi fornecido pelo gestor como relatório, sem novo acesso ao banco.
-- Editar a lista de mensagens exatas em `config/ads-triggers.txt`, carregada por `BOT_ADS_TRIGGERS_FILE`. Não usar match genérico, regex ou substring para acionar campanha CRM.
+- A lista de mensagens exatas em `config/ads-triggers.txt` já contém **duas frases reais** (Primeiro Natal e Natal em Tijucas); editar novas frases somente quando comprovadas em criativo ou aprovadas, carregada por `BOT_ADS_TRIGGERS_FILE`. Não usar match genérico, regex ou substring para acionar campanha CRM.
 - O registro Ads agora propaga `AdsFallback`, e mensagens não correspondentes recebem saudação/menu no **MESMO** número de anúncios; greeting futuro em instância independente só faz saudação.
-- Funil Ads: texto com `{{nome}}` seguro, PTT, imagem opcional, vídeo MP4 opcional, CRM 416 SEM NOME por último, com dependência durável de execução. Não interpretar `uncertain` como confirmação de entrega.
+- Funil Ads: texto com `{{nome}}` seguro, PTT, imagem opcional, vídeo MP4 opcional, CRM 416 SEM NOME por último, com dependência durável de execução. `BOT_ADS_FLOW_COOLDOWN_HOURS` padrão 24h bloqueia nova sequência do mesmo contato e preserva `PARAR`/pausa humana por atualizações atômicas de contato. Não interpretar `uncertain` como confirmação de entrega.
 - O relatório de webhook anexado expôs material como `instanceToken`: NÃO COMMITAR O JSON BRUTO e solicitar verificação/rotação do token se ainda válido.
 - Mídias reais não estão incluídas: flags comerciais OFF, nada de disparos reais, CRM somente leitura.
 
