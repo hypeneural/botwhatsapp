@@ -17,49 +17,75 @@ import (
 	"github.com/hypeneural/botwhatsapp/internal/relay"
 )
 
-func getenv(k,def string) string {
-	if x:=os.Getenv(k);x!=""{return x}
+func getenv(k, def string) string {
+	if x := os.Getenv(k); x != "" {
+		return x
+	}
 	return def
 }
-func main(){
-	enabled:=os.Getenv("RELAY_ENABLED")=="true"
-	max:=20000
-	if s:=os.Getenv("RELAY_MAX_EVENTS");s!=""{
-		v,e:=strconv.Atoi(s)
-		if e!=nil||v<1||v>100000 {log.Fatal("invalid RELAY_MAX_EVENTS")}
-		max=v
+func main() {
+	enabled := os.Getenv("RELAY_ENABLED") == "true"
+	max := 20000
+	if s := os.Getenv("RELAY_MAX_EVENTS"); s != "" {
+		v, e := strconv.Atoi(s)
+		if e != nil || v < 1 || v > 100000 {
+			log.Fatal("invalid RELAY_MAX_EVENTS")
+		}
+		max = v
 	}
-	maxBytes:=int64(128<<20)
-	if str:=os.Getenv("RELAY_MAX_SPOOL_BYTES");str!=""{
-		v,e:=strconv.ParseInt(str,10,64)
-		if e!=nil||v<4096||v>16<<30 {log.Fatal("invalid RELAY_MAX_SPOOL_BYTES")}
-		maxBytes=v
+	maxBytes := int64(128 << 20)
+	if str := os.Getenv("RELAY_MAX_SPOOL_BYTES"); str != "" {
+		v, e := strconv.ParseInt(str, 10, 64)
+		if e != nil || v < 4096 || v > 16<<30 {
+			log.Fatal("invalid RELAY_MAX_SPOOL_BYTES")
+		}
+		maxBytes = v
 	}
-	store,err:=relay.NewStoreWithLimits(getenv("RELAY_DATA_DIR","./data/relay"),max,maxBytes)
-	if err!=nil{log.Fatal("relay store init failed: ",err)}
-	cfg:=relay.Config{
-		Enabled:enabled,
-		ExpectedInstanceUUID:os.Getenv("RELAY_EXPECTED_INSTANCE_UUID"),
-		Secret:os.Getenv("RELAY_INGRESS_SECRET"),
-		StatusURL:os.Getenv("RELAY_STATUS_URL"),
-		BotURL:os.Getenv("RELAY_BOT_URL"),
+	store, err := relay.NewStoreWithLimits(getenv("RELAY_DATA_DIR", "./data/relay"), max, maxBytes)
+	if err != nil {
+		log.Fatal("relay store init failed: ", err)
 	}
-	svc,err:=relay.New(cfg,store)
-	if err!=nil{log.Fatal("relay configuration invalid: ",err)}
-	ctx,stop:=signal.NotifyContext(context.Background(),os.Interrupt,syscall.SIGTERM)
+	maxBodyBytes := int64(32 << 20)
+	if str := os.Getenv("RELAY_MAX_BODY_BYTES"); str != "" {
+		v, e := strconv.ParseInt(str, 10, 64)
+		if e != nil || v < 1<<20 || v > 100<<20 {
+			log.Fatal("invalid RELAY_MAX_BODY_BYTES")
+		}
+		maxBodyBytes = v
+	}
+	cfg := relay.Config{
+		Enabled:              enabled,
+		ExpectedInstanceUUID: os.Getenv("RELAY_EXPECTED_INSTANCE_UUID"),
+		Secret:               os.Getenv("RELAY_INGRESS_SECRET"),
+		StatusURL:            os.Getenv("RELAY_STATUS_URL"),
+		BotURL:               os.Getenv("RELAY_BOT_URL"),
+		MaxBodyBytes:         maxBodyBytes,
+	}
+	svc, err := relay.New(cfg, store)
+	if err != nil {
+		log.Fatal("relay configuration invalid: ", err)
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if enabled {
-		go svc.Run(ctx,func(err error){
+		go svc.Run(ctx, func(err error) {
 			// Never print error bodies, headers, token-bearing URLs or PII.
-			log.Printf("relay delivery/storage requires attention: %T",err)
+			log.Printf("relay delivery/storage requires attention: %T", err)
 		})
 	}
-	addr:=getenv("RELAY_LISTEN_ADDR","127.0.0.1:8789")
-	server:=&http.Server{Addr:addr,Handler:svc,
-		ReadHeaderTimeout:5*time.Second,ReadTimeout:10*time.Second,
-		WriteTimeout:10*time.Second,IdleTimeout:30*time.Second,MaxHeaderBytes:8192,
+	addr := getenv("RELAY_LISTEN_ADDR", "127.0.0.1:8789")
+	server := &http.Server{Addr: addr, Handler: svc,
+		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second,
+		WriteTimeout: 10 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 8192,
 	}
-	go func(){<-ctx.Done();shutdownCtx,cancel:=context.WithTimeout(context.Background(),10*time.Second);defer cancel();_ = server.Shutdown(shutdownCtx)}()
-	log.Printf("webhook-relay enabled=%t; no existing status-engine ports are modified",enabled)
-	if err:=server.ListenAndServe();err!=nil&&err!=http.ErrServerClosed{log.Fatalf("relay listen failed: %T",err)}
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+	}()
+	log.Printf("webhook-relay enabled=%t; no existing status-engine ports are modified", enabled)
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("relay listen failed: %T", err)
+	}
 }

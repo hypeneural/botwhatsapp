@@ -51,8 +51,10 @@ func main() {
 	adsUUID := strings.TrimSpace(os.Getenv("BOT_ADS_INSTANCE_UUID"))
 	greetingUUID := strings.TrimSpace(os.Getenv("BOT_GREETING_INSTANCE_UUID"))
 
-	triggers,err:=loadAdTriggers()
-	if err!=nil {log.Fatalf("invalid ad trigger configuration: %T",err)}
+	triggers, err := loadAdTriggers()
+	if err != nil {
+		log.Fatalf("invalid ad trigger configuration: %T", err)
+	}
 
 	defs := make([]instances.Definition, 0, 2)
 	secrets := make(map[string]string)
@@ -65,9 +67,9 @@ func main() {
 		defs = append(defs, instances.Definition{
 			Slug: "ads", InstanceUUID: adsUUID,
 			BusinessPhoneE164: env("BOT_ADS_PHONE", "554832200440"),
-			Role: instances.Ads, Enabled: true, TokenEnv: "EVOLUTION_ADS_APIKEY",
+			Role:              instances.Ads, Enabled: true, TokenEnv: "EVOLUTION_ADS_APIKEY",
 			WebhookSecretEnv: "BOT_ADS_WEBHOOK_SECRET",
-			AdsTriggers: triggers, AdsFallback: env("BOT_ADS_FALLBACK_MENU","true")=="true", CRMAllowed: true,
+			AdsTriggers:      triggers, AdsFallback: env("BOT_ADS_FALLBACK_MENU", "true") == "true", CRMAllowed: true,
 		})
 		secrets["ads"] = os.Getenv("BOT_ADS_WEBHOOK_SECRET")
 		if outboundEnabled {
@@ -82,7 +84,7 @@ func main() {
 		defs = append(defs, instances.Definition{
 			Slug: "greeting", InstanceUUID: greetingUUID,
 			BusinessPhoneE164: env("BOT_GREETING_PHONE", "5548996425287"),
-			Role: instances.Greeting, Enabled: true, TokenEnv: "EVOLUTION_GREETING_APIKEY",
+			Role:              instances.Greeting, Enabled: true, TokenEnv: "EVOLUTION_GREETING_APIKEY",
 			WebhookSecretEnv: "BOT_GREETING_WEBHOOK_SECRET",
 		})
 		secrets["greeting"] = os.Getenv("BOT_GREETING_WEBHOOK_SECRET")
@@ -117,7 +119,7 @@ func main() {
 	}
 	coreCfg := core.Config{
 		AdsUUID: adsUUID, GreetingUUID: greetingUUID, AdsTriggers: triggers,
-		AdsFallback: env("BOT_ADS_FALLBACK_MENU","true")=="true",
+		AdsFallback: env("BOT_ADS_FALLBACK_MENU", "true") == "true",
 	}
 
 	var worker *outbox.Worker
@@ -141,13 +143,17 @@ func main() {
 			log.Fatal("ads campaign requires EVIDENCIA_CRM_AUTHORIZATION")
 		}
 		crmClient := crm.Client{
-			BaseURL: env("EVIDENCIA_CRM_BASE_URL", "https://evydencia.com"),
+			BaseURL:       env("EVIDENCIA_CRM_BASE_URL", "https://evydencia.com"),
 			Authorization: os.Getenv("EVIDENCIA_CRM_AUTHORIZATION"),
 		}
 		audio := readAsset("BOT_ADS_AUDIO_FILE")
 		image := readAsset("BOT_GREETING_IMAGE_FILE")
 		adImage := readAsset("BOT_ADS_IMAGE_FILE")
 		adVideo := readAsset("BOT_ADS_VIDEO_FILE")
+		adDoc := readAsset("BOT_ADS_DOCUMENT_FILE")
+		if len(adDoc) > 0 && !strings.HasPrefix(string(adDoc), "%PDF-") {
+			log.Fatal("BOT_ADS_DOCUMENT_FILE must be a valid PDF (starting with %PDF-)")
+		}
 		// Validate configured files before allowing live media. Explicitly
 		// missing files remain suppressed by the outbox; never send a fake.
 		if len(audio) > 0 && (!strings.HasPrefix(string(audio), "OggS") || !strings.Contains(string(audio[:min(len(audio), 128)]), "OpusHead")) {
@@ -157,38 +163,69 @@ func main() {
 			(len(image) >= 3 && image[0] == 0xff && image[1] == 0xd8 && image[2] == 0xff)) {
 			log.Fatal("BOT_GREETING_IMAGE_FILE must be PNG or JPEG")
 		}
-		if len(adImage)>0 && !(strings.HasPrefix(string(adImage),"\x89PNG\r\n\x1a\n") ||
-			(len(adImage)>=3&&adImage[0]==0xff&&adImage[1]==0xd8&&adImage[2]==0xff)) {
+		if len(adImage) > 0 && !(strings.HasPrefix(string(adImage), "\x89PNG\r\n\x1a\n") ||
+			(len(adImage) >= 3 && adImage[0] == 0xff && adImage[1] == 0xd8 && adImage[2] == 0xff)) {
 			log.Fatal("BOT_ADS_IMAGE_FILE must be PNG or JPEG")
 		}
-		if len(adVideo)>0 && !(len(adVideo)>=12&&string(adVideo[4:8])=="ftyp") {
+		if len(adVideo) > 0 && !(len(adVideo) >= 12 && string(adVideo[4:8]) == "ftyp") {
 			log.Fatal("BOT_ADS_VIDEO_FILE must be MP4 (up to 8MiB)")
 		}
-		adsCooldownHours,err:=strconv.Atoi(env("BOT_ADS_FLOW_COOLDOWN_HOURS","24"))
-		if err!=nil || adsCooldownHours<1 || adsCooldownHours>168 {
+		adsCooldownHours, err := strconv.Atoi(env("BOT_ADS_FLOW_COOLDOWN_HOURS", "24"))
+		if err != nil || adsCooldownHours < 1 || adsCooldownHours > 168 {
 			log.Fatal("BOT_ADS_FLOW_COOLDOWN_HOURS must be between 1 and 168")
 		}
-		cfg := outbox.Config{
-			DataDir: dataDir, GreetingCooldown: 24 * time.Hour, AdsFlowCooldown:time.Duration(adsCooldownHours)*time.Hour,
-			CRMInstanceID: crmInstanceID,
-			OperationalAuthorization: opAuth,
-			AdAudioFixture: audio, GreetingImageFixture: image,
-			AdImageFixture:adImage,AdVideoFixture:adVideo,
-			AdWelcomeText: env("BOT_ADS_RESPONSE_TEXT", "Oi, {{nome}}! 🎄❤️ Que alegria receber você! No Estúdio Evidência em Tijucas temos cenários especiais de Natal e Ano Novo. Vou te enviar os detalhes e nossa proposta de Natal 2026 chegará pelo WhatsApp oficial do estúdio."),
-			Tenant: env("BOT_TENANT", "estudio-evydencia"),
-			Location: loc, TaskRetention: 7 * 24 * time.Hour,
-			MaxTasksCount: 10000, Senders: senders,
+		adWelcome := env("BOT_ADS_RESPONSE_TEXT", "Oi, tudo bem?\nSeja bem vindo ao estúdio de fotos de natal Evydência\nVeja mais fotos no nosso instagram.com/estudioevydenciaa")
+		if path := os.Getenv("BOT_ADS_RESPONSE_TEXT_FILE"); path != "" {
+			raw, err := os.ReadFile(path)
+			if err != nil || strings.TrimSpace(string(raw)) == "" {
+				log.Fatal("invalid ad response text file")
+			}
+			adWelcome = string(raw)
 		}
-		if path:=os.Getenv("BOT_ADS_IMAGE_CAPTION_FILE");path!=""{
-			raw,err:=os.ReadFile(path)
-			if err!=nil||strings.TrimSpace(string(raw))==""{log.Fatal("invalid ad image caption file")}
-			cfg.AdImageCaption=string(raw)
-		}else{cfg.AdImageCaption=env("BOT_ADS_IMAGE_CAPTION","🎄 Natal + Ano Novo no Estúdio Evidência, em Tijucas! Veja nossos pacotes: https://evydencia.com/catalogo/natal")}
-		if path:=os.Getenv("BOT_ADS_VIDEO_CAPTION_FILE");path!=""{
-			raw,err:=os.ReadFile(path)
-			if err!=nil||strings.TrimSpace(string(raw))==""{log.Fatal("invalid ad video caption file")}
-			cfg.AdVideoCaption=string(raw)
-		}else{cfg.AdVideoCaption=os.Getenv("BOT_ADS_VIDEO_CAPTION")}
+		adClosing := env("BOT_ADS_CLOSING_TEXT", "O nosso outro WhatsApp vai entrar em contato com mais informações também, mas qualquer dúvida pode falar.")
+		if path := os.Getenv("BOT_ADS_CLOSING_TEXT_FILE"); path != "" {
+			raw, err := os.ReadFile(path)
+			if err != nil || strings.TrimSpace(string(raw)) == "" {
+				log.Fatal("invalid ad closing text file")
+			}
+			adClosing = string(raw)
+		}
+		cfg := outbox.Config{
+			DataDir: dataDir, GreetingCooldown: 24 * time.Hour, AdsFlowCooldown: time.Duration(adsCooldownHours) * time.Hour,
+			CRMInstanceID:            crmInstanceID,
+			OperationalAuthorization: opAuth,
+			AdAudioFixture:           audio,
+			AdDocumentFixture:        adDoc,
+			AdDocumentFilename:       env("BOT_ADS_DOCUMENT_FILENAME", "Proposta_Natal.pdf"),
+			GreetingImageFixture:     image,
+			AdImageFixture:           adImage,
+			AdVideoFixture:           adVideo,
+			AdWelcomeText:            adWelcome,
+			AdClosingText:            adClosing,
+			Tenant:                   env("BOT_TENANT", "estudio-evydencia"),
+			Location:                 loc,
+			TaskRetention:            7 * 24 * time.Hour,
+			MaxTasksCount:            10000,
+			Senders:                  senders,
+		}
+		if path := os.Getenv("BOT_ADS_IMAGE_CAPTION_FILE"); path != "" {
+			raw, err := os.ReadFile(path)
+			if err != nil || strings.TrimSpace(string(raw)) == "" {
+				log.Fatal("invalid ad image caption file")
+			}
+			cfg.AdImageCaption = string(raw)
+		} else {
+			cfg.AdImageCaption = env("BOT_ADS_IMAGE_CAPTION", "🎄 Natal + Ano Novo no Estúdio Evidência, em Tijucas! Veja nossos pacotes: https://evydencia.com/catalogo/natal")
+		}
+		if path := os.Getenv("BOT_ADS_VIDEO_CAPTION_FILE"); path != "" {
+			raw, err := os.ReadFile(path)
+			if err != nil || strings.TrimSpace(string(raw)) == "" {
+				log.Fatal("invalid ad video caption file")
+			}
+			cfg.AdVideoCaption = string(raw)
+		} else {
+			cfg.AdVideoCaption = os.Getenv("BOT_ADS_VIDEO_CAPTION")
+		}
 		if path := os.Getenv("BOT_GREETING_CAPTION_FILE"); path != "" {
 			raw, err := os.ReadFile(path)
 			if err != nil || strings.TrimSpace(string(raw)) == "" {
@@ -220,7 +257,7 @@ func main() {
 	h, err := ingress.New(ingress.Settings{
 		Enabled: enabled, AdsSecret: secrets["ads"],
 		GreetingSecret: secrets["greeting"],
-		SpoolDir: dataDir, Core: coreCfg, OnDecision: onDecision,
+		SpoolDir:       dataDir, Core: coreCfg, OnDecision: onDecision,
 		Registry: reg, Secrets: secrets,
 	})
 	if err != nil {

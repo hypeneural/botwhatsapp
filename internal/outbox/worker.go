@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -31,7 +32,9 @@ func NewWorker(cfg Config, store *Store, evolution EvolutionSender, crmScheduler
 	if cfg.GreetingCooldown <= 0 {
 		cfg.GreetingCooldown = 24 * time.Hour
 	}
-	if cfg.AdsFlowCooldown <= 0 {cfg.AdsFlowCooldown=24*time.Hour}
+	if cfg.AdsFlowCooldown <= 0 {
+		cfg.AdsFlowCooldown = 24 * time.Hour
+	}
 	if cfg.AdWelcomeText == "" {
 		cfg.AdWelcomeText = "Oii! Tudo bem? 🎄❤️ Que alegria receber seu contato! Vamos enviar a proposta de Natal 2026 por outro WhatsApp oficial do Estúdio Evidência."
 	}
@@ -72,10 +75,14 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 	defer w.mu.Unlock()
 
 	// 1. If reason is opt-out suppression, record it immediately and stop.
-	if d.Reason=="opt_out_requires_persistent_suppression" {
-		if d.PhoneE164=="" {return errors.New("outbox: opt-out without telephone")}
-		_,err:=w.store.UpdateContact(d.PhoneE164,func(c *ContactState)error{
-			c.OptOut=true;c.OptOutAt=time.Now().UTC();return nil
+	if d.Reason == "opt_out_requires_persistent_suppression" {
+		if d.PhoneE164 == "" {
+			return errors.New("outbox: opt-out without telephone")
+		}
+		_, err := w.store.UpdateContact(d.PhoneE164, func(c *ContactState) error {
+			c.OptOut = true
+			c.OptOutAt = time.Now().UTC()
+			return nil
 		})
 		return err
 	}
@@ -113,43 +120,54 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 	// Commit human takeover synchronously with ingress. A queued greeting
 	// or CRM attempt may no longer start after the customer asks for a person.
 	if d.Action == core.MenuOption && d.Option == "5" {
-		if _,err:=w.store.UpdateContact(d.PhoneE164,func(c *ContactState)error{
-			c.HumanPaused=true;c.HumanPausedAt=time.Now().UTC();return nil
-		});err!=nil{return err}
+		if _, err := w.store.UpdateContact(d.PhoneE164, func(c *ContactState) error {
+			c.HumanPaused = true
+			c.HumanPausedAt = time.Now().UTC()
+			return nil
+		}); err != nil {
+			return err
+		}
 	}
 	// 5. Create workflow plan and enqueue tasks
-	plan := workflow.CreateWithOptions(d,workflow.Options{
-		AdImage:len(w.cfg.AdImageFixture)>0,AdVideo:len(w.cfg.AdVideoFixture)>0,
-		GreetingImage:len(w.cfg.GreetingImageFixture)>0,
+	plan := workflow.CreateWithOptions(d, workflow.Options{
+		AdDocument:    len(w.cfg.AdDocumentFixture) > 0,
+		AdClosingText: strings.TrimSpace(w.cfg.AdClosingText) != "",
+		AdImage:       len(w.cfg.AdImageFixture) > 0,
+		AdVideo:       len(w.cfg.AdVideoFixture) > 0,
+		GreetingImage: len(w.cfg.GreetingImageFixture) > 0,
 	})
 	if len(plan.Steps) == 0 {
 		return nil
 	}
 
 	eventKey, err := instances.EventKey(d.InstanceID, "Message", d.MessageID)
-	if err != nil {return err}
+	if err != nil {
+		return err
+	}
 	tasks := make([]Task, 0, len(plan.Steps))
 	var previousID string
 	for idx, step := range plan.Steps {
 		taskID := fmt.Sprintf("%s-%02d-%s", eventKey, idx, step)
 		task := Task{
-			ID:           taskID,
-			PreviousTaskID: previousID,
-			EventKey:     eventKey,
-			InstanceID:   d.InstanceID,
-			RecipientJID: d.ReplyJID,
-			PhoneE164:    d.PhoneE164,
-			CRMPhone:     d.CRMPhone,
-			ContactName:  d.Name,
-			Step:         step,
-			State:        TaskPending,
+			ID:                taskID,
+			PreviousTaskID:    previousID,
+			EventKey:          eventKey,
+			InstanceID:        d.InstanceID,
+			RecipientJID:      d.ReplyJID,
+			PhoneE164:         d.PhoneE164,
+			CRMPhone:          d.CRMPhone,
+			ContactName:       d.Name,
+			Step:              step,
+			State:             TaskPending,
 			AllowOnHumanPause: d.Action == core.MenuOption && d.Option == "5" && step == workflow.SendMenuReply,
-			CreatedAt:    time.Now().UTC(),
+			CreatedAt:         time.Now().UTC(),
 		}
 
 		switch step {
 		case workflow.SendAdText:
-			task.PayloadText = personalize(w.cfg.AdWelcomeText,d.Name)
+			task.PayloadText = personalize(w.cfg.AdWelcomeText, d.Name)
+		case workflow.SendAdClosingText:
+			task.PayloadText = personalize(w.cfg.AdClosingText, d.Name)
 		case workflow.SendAdImage:
 			task.PayloadCaption = w.cfg.AdImageCaption
 		case workflow.SendAdVideo:
@@ -163,16 +181,23 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 		}
 
 		tasks = append(tasks, task)
-		previousID=taskID
+		previousID = taskID
 	}
 	// Commit all tasks and the dedup marker in one serialized disk operation.
 	// On failure, the marker is not committed so the webhook can retry safely.
 	isNew, err := w.store.CommitEventTasks(d.InstanceID, "Message", d.MessageID, tasks)
-	if err != nil { return fmt.Errorf("outbox: cannot commit event tasks: %w", err) }
-	if !isNew { return ErrEventDuplicate }
+	if err != nil {
+		return fmt.Errorf("outbox: cannot commit event tasks: %w", err)
+	}
+	if !isNew {
+		return ErrEventDuplicate
+	}
 	// Prompt processing immediately; a full queue never drops the durable task.
 	for _, task := range tasks {
-		select { case w.taskCh <- task: default: }
+		select {
+		case w.taskCh <- task:
+		default:
+		}
 	}
 	return nil
 }
@@ -192,22 +217,28 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 	// Preserve the configured order even when recovery or queue scheduling
 	// observes tasks out of order. Previous stage may be confirmed, uncertain
 	// or suppressed; those are terminal and do not silently replay.
-	if task.PreviousTaskID!="" {
-		prev,err:=w.store.GetTask(task.PreviousTaskID)
-		if err!=nil {return fmt.Errorf("outbox: preceding task missing/unreadable: %w",err)}
-		if prev.State==TaskPending || prev.State==TaskAttemptStarted {return nil}
+	if task.PreviousTaskID != "" {
+		prev, err := w.store.GetTask(task.PreviousTaskID)
+		if err != nil {
+			return fmt.Errorf("outbox: preceding task missing/unreadable: %w", err)
+		}
+		if prev.State == TaskPending || prev.State == TaskAttemptStarted {
+			return nil
+		}
 		// When the opening text of an ad was suppressed for cooldown,
 		// the remaining audio/visual/CRM stages from THAT duplicate event
 		// must also be suppressed, not merely wait for the daily CRM claim.
-		if prev.State==TaskSuppressed && (prev.Error=="ads flow cooldown" ||
-			prev.Error=="ads flow cooldown cascade") {
-			return w.recordSuppressed(task.ID,"ads flow cooldown cascade")
+		if prev.State == TaskSuppressed && (prev.Error == "ads flow cooldown" ||
+			prev.Error == "ads flow cooldown cascade") {
+			return w.recordSuppressed(task.ID, "ads flow cooldown cascade")
 		}
 	}
 
 	// Check contact opt-out once more before starting attempt
 	contact, err := w.store.GetContact(task.PhoneE164)
-	if err != nil { return fmt.Errorf("outbox: cannot read contact policy: %w", err) }
+	if err != nil {
+		return fmt.Errorf("outbox: cannot read contact policy: %w", err)
+	}
 	if contact.OptOut || (contact.HumanPaused && task.Step != workflow.PauseHuman && !task.AllowOnHumanPause) {
 		_, err = w.store.UpdateTaskState(task.ID, func(t *Task) error {
 			t.State = TaskSuppressed
@@ -220,22 +251,25 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 
 	// Last defense against multiple greetings queued before the first image
 	// was actually sent (ingress cooldown alone is insufficient).
-	if (task.Step==workflow.SendGreetingImage || task.Step==workflow.SendGreetingText) && !workflow.IsGreetingDue(
-		contact.LastGreetingAt,time.Now().UTC(),w.cfg.GreetingCooldown,contact.HumanPaused) {
-		return w.recordSuppressed(task.ID,"greeting cooldown not elapsed at send time")
+	if (task.Step == workflow.SendGreetingImage || task.Step == workflow.SendGreetingText) && !workflow.IsGreetingDue(
+		contact.LastGreetingAt, time.Now().UTC(), w.cfg.GreetingCooldown, contact.HumanPaused) {
+		return w.recordSuppressed(task.ID, "greeting cooldown not elapsed at send time")
 	}
 	// Do not transmit fake/missing media; suppress BEFORE attempt_started.
+	if task.Step == workflow.SendAdDocument && len(w.cfg.AdDocumentFixture) == 0 {
+		return w.recordSuppressed(task.ID, "ad document unavailable: no outbound request attempted")
+	}
 	if task.Step == workflow.SendAdAudio && len(w.cfg.AdAudioFixture) == 0 {
 		return w.recordSuppressed(task.ID, "audio asset missing: no outbound request attempted")
 	}
 	if task.Step == workflow.SendGreetingImage && len(w.cfg.GreetingImageFixture) == 0 {
 		return w.recordSuppressed(task.ID, "greeting image asset missing: no outbound request attempted")
 	}
-	if task.Step == workflow.SendAdImage && len(w.cfg.AdImageFixture)==0 {
-		return w.recordSuppressed(task.ID,"ad image unavailable: no outbound request attempted")
+	if task.Step == workflow.SendAdImage && len(w.cfg.AdImageFixture) == 0 {
+		return w.recordSuppressed(task.ID, "ad image unavailable: no outbound request attempted")
 	}
-	if task.Step == workflow.SendAdVideo && len(w.cfg.AdVideoFixture)==0 {
-		return w.recordSuppressed(task.ID,"ad video unavailable: no outbound request attempted")
+	if task.Step == workflow.SendAdVideo && len(w.cfg.AdVideoFixture) == 0 {
+		return w.recordSuppressed(task.ID, "ad video unavailable: no outbound request attempted")
 	}
 	// Transition ATOMICALLY to attempt_started with fsync before issuing outbound call
 	task, err = w.store.UpdateTaskState(task.ID, func(t *Task) error {
@@ -250,16 +284,23 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 	// Claim the entire ad workflow on the FIRST text step before any network
 	// request. An ambiguous timeout counts as an attempt to avoid flooding
 	// the same customer with a second full marketing sequence.
-	if task.Step==workflow.SendAdText {
-		_,err:=w.store.UpdateContact(task.PhoneE164,func(c *ContactState)error{
-			if c.OptOut||c.HumanPaused {return errors.New("contact is now suppressed")}
-			if !c.LastAdsFlowAt.IsZero() && time.Since(c.LastAdsFlowAt)<w.cfg.AdsFlowCooldown {
+	if task.Step == workflow.SendAdText {
+		_, err := w.store.UpdateContact(task.PhoneE164, func(c *ContactState) error {
+			if c.OptOut || c.HumanPaused {
+				return errors.New("contact is now suppressed")
+			}
+			if !c.LastAdsFlowAt.IsZero() && time.Since(c.LastAdsFlowAt) < w.cfg.AdsFlowCooldown {
 				return errAdsCooldown
 			}
-			c.LastAdsFlowAt=time.Now().UTC();return nil
+			c.LastAdsFlowAt = time.Now().UTC()
+			return nil
 		})
-		if errors.Is(err,errAdsCooldown) {return w.recordSuppressed(task.ID,"ads flow cooldown")}
-		if err!=nil{return w.recordUncertain(task.ID,"ads cooldown/contact policy persistence unavailable")}
+		if errors.Is(err, errAdsCooldown) {
+			return w.recordSuppressed(task.ID, "ads flow cooldown")
+		}
+		if err != nil {
+			return w.recordUncertain(task.ID, "ads cooldown/contact policy persistence unavailable")
+		}
 	}
 	// Sender routing is strict when multiple instances are configured.
 	// Missing sender means suppress/fail closed, never use another account's key.
@@ -292,15 +333,47 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 		return w.recordConfirmed(task.ID, extID)
 
 	case workflow.SendAdImage:
-		if sender==nil{return w.recordUncertain(task.ID,"evolution sender not configured")}
-		id,err:=sender.SendMedia(ctx,task.RecipientJID,"image",w.cfg.AdImageFixture,task.PayloadCaption)
-		if err!=nil{return w.recordUncertain(task.ID,err.Error())}
-		return w.recordConfirmed(task.ID,id)
+		if sender == nil {
+			return w.recordUncertain(task.ID, "evolution sender not configured")
+		}
+		id, err := sender.SendMedia(ctx, task.RecipientJID, "image", w.cfg.AdImageFixture, task.PayloadCaption)
+		if err != nil {
+			return w.recordUncertain(task.ID, err.Error())
+		}
+		return w.recordConfirmed(task.ID, id)
 	case workflow.SendAdVideo:
-		if sender==nil{return w.recordUncertain(task.ID,"evolution sender not configured")}
-		id,err:=sender.SendMedia(ctx,task.RecipientJID,"video",w.cfg.AdVideoFixture,task.PayloadCaption)
-		if err!=nil{return w.recordUncertain(task.ID,err.Error())}
-		return w.recordConfirmed(task.ID,id)
+		if sender == nil {
+			return w.recordUncertain(task.ID, "evolution sender not configured")
+		}
+		id, err := sender.SendMedia(ctx, task.RecipientJID, "video", w.cfg.AdVideoFixture, task.PayloadCaption)
+		if err != nil {
+			return w.recordUncertain(task.ID, err.Error())
+		}
+		return w.recordConfirmed(task.ID, id)
+	case workflow.SendAdDocument:
+		if sender == nil {
+			return w.recordUncertain(task.ID, "evolution sender not configured")
+		}
+		filename := w.cfg.AdDocumentFilename
+		if filename == "" {
+			filename = "Proposta_Natal.pdf"
+		}
+		id, err := sender.SendDocument(ctx, task.RecipientJID, w.cfg.AdDocumentFixture, filename)
+		if err != nil {
+			return w.recordUncertain(task.ID, err.Error())
+		}
+		return w.recordConfirmed(task.ID, id)
+
+	case workflow.SendAdClosingText:
+		if sender == nil {
+			return w.recordUncertain(task.ID, "evolution sender not configured")
+		}
+		id, err := sender.SendText(ctx, task.RecipientJID, task.PayloadText)
+		if err != nil {
+			return w.recordUncertain(task.ID, err.Error())
+		}
+		return w.recordConfirmed(task.ID, id)
+
 	case workflow.ScheduleNatal:
 		return w.executeScheduleNatal(ctx, task)
 
@@ -313,25 +386,30 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 			return w.recordUncertain(task.ID, err.Error())
 		}
 		// Record successful greeting timestamp on contact
-		if _,err:=w.store.UpdateContact(task.PhoneE164,func(c *ContactState)error{
-			c.LastGreetingAt=time.Now().UTC();return nil
-		});err!=nil{
+		if _, err := w.store.UpdateContact(task.PhoneE164, func(c *ContactState) error {
+			c.LastGreetingAt = time.Now().UTC()
+			return nil
+		}); err != nil {
 			// Media was already sent; do not retry on contact state persistence failure.
 			return w.recordUncertain(task.ID, "greeting sent; contact cooldown persistence failed")
 		}
 		return w.recordConfirmed(task.ID, extID)
 
-
 	case workflow.SendGreetingText:
-		if sender==nil{return w.recordUncertain(task.ID,"evolution sender not configured")}
-		id,err:=sender.SendText(ctx,task.RecipientJID,task.PayloadText)
-		if err!=nil{return w.recordUncertain(task.ID,err.Error())}
-		if _,err:=w.store.UpdateContact(task.PhoneE164,func(c *ContactState)error{
-			c.LastGreetingAt=time.Now().UTC();return nil
-		});err!=nil{
-			return w.recordUncertain(task.ID,"text greeting sent; cooldown persistence failed")
+		if sender == nil {
+			return w.recordUncertain(task.ID, "evolution sender not configured")
 		}
-		return w.recordConfirmed(task.ID,id)
+		id, err := sender.SendText(ctx, task.RecipientJID, task.PayloadText)
+		if err != nil {
+			return w.recordUncertain(task.ID, err.Error())
+		}
+		if _, err := w.store.UpdateContact(task.PhoneE164, func(c *ContactState) error {
+			c.LastGreetingAt = time.Now().UTC()
+			return nil
+		}); err != nil {
+			return w.recordUncertain(task.ID, "text greeting sent; cooldown persistence failed")
+		}
+		return w.recordConfirmed(task.ID, id)
 
 	case workflow.SendMenuReply:
 		if sender == nil {
@@ -344,9 +422,11 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 		return w.recordConfirmed(task.ID, extID)
 
 	case workflow.PauseHuman:
-		if _,err:=w.store.UpdateContact(task.PhoneE164,func(c *ContactState)error{
-			c.HumanPaused=true;c.HumanPausedAt=time.Now().UTC();return nil
-		});err!=nil{
+		if _, err := w.store.UpdateContact(task.PhoneE164, func(c *ContactState) error {
+			c.HumanPaused = true
+			c.HumanPausedAt = time.Now().UTC()
+			return nil
+		}); err != nil {
 			return w.recordUncertain(task.ID, "human pause persistence failed")
 		}
 		return w.recordConfirmed(task.ID, "internal-pause-applied")
@@ -454,13 +534,12 @@ func (w *Worker) DrainPending(ctx context.Context) (int, error) {
 	return count, nil
 }
 
-
 // PendingTasks is only an optimization. Durable storage and periodic recovery
 // remain authoritative if the bounded queue is full or the process restarts.
 func (w *Worker) PendingTasks() <-chan Task { return w.taskCh }
 
 // PruneCompleted is explicit and never removes pending or uncertain tasks.
 // Invoke on a low-frequency maintenance schedule, not on every webhook.
-func (w *Worker) PruneCompleted() (int,error) {
-	return w.store.PruneOldTasks(w.cfg.TaskRetention,w.cfg.MaxTasksCount)
+func (w *Worker) PruneCompleted() (int, error) {
+	return w.store.PruneOldTasks(w.cfg.TaskRetention, w.cfg.MaxTasksCount)
 }

@@ -17,14 +17,14 @@ import (
 )
 
 type mockEvolutionSender struct {
-	mu           sync.Mutex
-	textCalls    int
-	mediaCalls   int
-	failAudio    bool
-	textErr      error
-	mediaErr     error
-	sentTexts    []string
-	sentMedia    []string
+	mu         sync.Mutex
+	textCalls  int
+	mediaCalls int
+	failAudio  bool
+	textErr    error
+	mediaErr   error
+	sentTexts  []string
+	sentMedia  []string
 }
 
 func (m *mockEvolutionSender) SendText(ctx context.Context, phone, text string) (string, error) {
@@ -50,6 +50,17 @@ func (m *mockEvolutionSender) SendMedia(ctx context.Context, phone, mediaType st
 	}
 	m.sentMedia = append(m.sentMedia, mediaType)
 	return fmt.Sprintf("evo-media-%d", m.mediaCalls), nil
+}
+
+func (m *mockEvolutionSender) SendDocument(ctx context.Context, phone string, file []byte, filename string) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.mediaCalls++
+	if m.mediaErr != nil {
+		return "", m.mediaErr
+	}
+	m.sentMedia = append(m.sentMedia, "document:"+filename)
+	return fmt.Sprintf("evo-doc-%d", m.mediaCalls), nil
 }
 
 type mockCRMScheduler struct {
@@ -420,8 +431,8 @@ func TestHumanHandoffAndCooldown(t *testing.T) {
 	evo := &mockEvolutionSender{}
 	crmMock := &mockCRMScheduler{}
 	cfg := Config{
-		DataDir:          dir,
-		GreetingCooldown: 24 * time.Hour,
+		DataDir:              dir,
+		GreetingCooldown:     24 * time.Hour,
 		GreetingImageFixture: []byte("synthetic-image-fixture"),
 	}
 
