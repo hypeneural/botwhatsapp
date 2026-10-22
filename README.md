@@ -1,6 +1,6 @@
 # BotWhatsApp — Estúdio Evidência
 
-Serviço Go independente para dois workflows do WhatsApp no Estúdio Evidência, integrado à **Evolution Go 0.7.2 instalada** e à **API existente do Evidência CRM**. Não modificar o código, banco ou infraestrutura do CRM.
+Serviço Go independente para dois workflows do WhatsApp no Estúdio Evidência, integrado à **Evolution Go 0.7.2 instalada** e à **API existente do Evidência CRM**. O número conectado aos anúncios recebe primeiro tratamento CTWA configurável, com saudação genérica se a frase não corresponder. Não modificar o código, banco ou infraestrutura do CRM.
 
 ## Estado em 22/10/2026
 
@@ -19,6 +19,15 @@ Serviço Go independente para dois workflows do WhatsApp no Estúdio Evidência,
 | Emissor da proposta | Configurado no CRM | Número do CRM escolhido por `message_instances.id` explícito (relato: instância 1), não confundir com a saudação |
 
 O inbound da instância `anderson` tem um webhook ocupado pelo serviço de status. **Nunca apontá-lo diretamente ao bot**, nem ocupar o :8050 ou alterar o status-engine para :8051.
+
+## Fluxo CTWA ativo no código (configuração comercial ainda OFF)
+
+- Texto padrão observado no relatório do Instagram: **Quero conhecer os pacotes do Primeiro Natal em Tijucas**.
+- Edite `config/ads-triggers.txt`: **uma ou mais frases completas, uma por linha**, até 50. O arquivo é carregado em `BOT_ADS_TRIGGERS_FILE` na inicialização; editar requer reinício **somente do bot** após autorização. Mensagens não correspondentes acionam a saudação no mesmo número Ads (`BOT_ADS_FALLBACK_MENU=true`).
+- Etapas do anúncio: **texto opcionalmente personalizado → áudio PTT → imagem opcional com caption → vídeo MP4 opcional com caption → CRM 416 sem nome**. Falha/ausência de mídia é registrada, sem reenvio cego nem bloqueio do CRM; o CRM só é acionado com autorização/lead validado.
+- A saudação usa uma imagem única com legenda quando configurada, senão envia o texto do menu 1–5. O número final **5287** terá somente saudação, em instância própria quando pareada.
+- Webhook com metadados CTWA agora aceita até 1 MiB (limite, não garantia de aceitar qualquer miniatura). Exemplo sanitizado `testdata/ctwa-first-natal.json`.
+- Leia `docs/CTWA-ROUTING-20261022.md` para decisões e ressalvas.
 
 ## Arquitetura
 
