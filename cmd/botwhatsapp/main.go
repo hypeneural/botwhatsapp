@@ -99,6 +99,10 @@ func main() {
 			senders[greetingUUID] = evolution.Client{BaseURL: evoBaseURL, Token: token}
 		}
 	}
+	if outboundEnabled && adsUUID != "" && greetingUUID != "" &&
+		os.Getenv("EVOLUTION_ADS_APIKEY") == os.Getenv("EVOLUTION_GREETING_APIKEY") {
+		log.Fatal("outbound accounts require distinct per-instance API keys")
+	}
 	var reg *instances.Registry
 	if len(defs) > 0 {
 		var err error
