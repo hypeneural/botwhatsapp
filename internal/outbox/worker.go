@@ -110,6 +110,13 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 		}
 	}
 
+	// Commit human takeover synchronously with ingress. A queued greeting
+	// or CRM attempt may no longer start after the customer asks for a person.
+	if d.Action == core.MenuOption && d.Option == "5" {
+		contact.HumanPaused = true
+		contact.HumanPausedAt = time.Now().UTC()
+		if err := w.store.SaveContact(contact); err != nil { return err }
+	}
 	// 5. Create workflow plan and enqueue tasks
 	plan := workflow.Create(d)
 	if len(plan.Steps) == 0 {
@@ -131,6 +138,7 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 			ContactName:  d.Name,
 			Step:         step,
 			State:        TaskPending,
+			AllowOnHumanPause: d.Action == core.MenuOption && d.Option == "5" && step == workflow.SendMenuReply,
 			CreatedAt:    time.Now().UTC(),
 		}
 
@@ -173,7 +181,7 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 	// Check contact opt-out once more before starting attempt
 	contact, err := w.store.GetContact(task.PhoneE164)
 	if err != nil { return fmt.Errorf("outbox: cannot read contact policy: %w", err) }
-	if contact.OptOut || (contact.HumanPaused && task.Step != workflow.PauseHuman) {
+	if contact.OptOut || (contact.HumanPaused && task.Step != workflow.PauseHuman && !task.AllowOnHumanPause) {
 		_, err = w.store.UpdateTaskState(task.ID, func(t *Task) error {
 			t.State = TaskSuppressed
 			t.Error = "suppressed: contact policy (opt-out or human handoff)"
@@ -183,6 +191,12 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 		return err
 	}
 
+	// Last defense against multiple greetings queued before the first image
+	// was actually sent (ingress cooldown alone is insufficient).
+	if task.Step == workflow.SendGreetingImage && !workflow.IsGreetingDue(
+		contact.LastGreetingAt,time.Now().UTC(),w.cfg.GreetingCooldown,contact.HumanPaused) {
+		return w.recordSuppressed(task.ID,"greeting cooldown not elapsed at send time")
+	}
 	// Do not transmit fake/missing media; suppress BEFORE attempt_started.
 	if task.Step == workflow.SendAdAudio && len(w.cfg.AdAudioFixture) == 0 {
 		return w.recordSuppressed(task.ID, "audio asset missing: no outbound request attempted")
