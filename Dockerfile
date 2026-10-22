@@ -6,7 +6,7 @@ WORKDIR /src
 COPY go.mod ./
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags="-s -w" -o /out/botwhatsapp ./cmd/botwhatsapp
+RUN CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags="-s -w" -o /out/botwhatsapp ./cmd/botwhatsapp
 
 FROM alpine:3.24.2
 # CA certificates are needed by https://evydencia.com. tzdata provides
