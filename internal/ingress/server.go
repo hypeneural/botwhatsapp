@@ -76,7 +76,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, "ready")
 		return
 	}
-	if strings.HasPrefix(r.URL.Path, "/static/") && r.Method == http.MethodGet && s.settings.StaticDir != "" {
+	if strings.HasPrefix(r.URL.Path, "/static/") && (r.Method == http.MethodGet || r.Method == http.MethodHead) && s.settings.StaticDir != "" {
 		http.StripPrefix("/static/", http.FileServer(http.Dir(s.settings.StaticDir))).ServeHTTP(w, r)
 		return
 	}
