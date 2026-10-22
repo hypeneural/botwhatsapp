@@ -12,3 +12,6 @@ description: Implementa e testa clientes HTTP, parser de webhooks, mensagens de 
 4. No projeto atual, modificar somente `internal/core`, `internal/evolution`, `internal/ingress`, `internal/workflow`; testes de contrato em `go test ./...`.
 5. Não alterar instâncias ou webhook durante auditoria. Quando houver autorização posterior, usar segredos independentes por rota, UUID/telefone confirmado, ambiente Docker privado e dry-run antes do primeiro send.
 6. Se a imagem local divergir, atualizar a referência com evidência exata e testes, não adivinhar.
+
+## Funções e smoke tests locais (sem VPS)
+Ler `docs/EVOLUTION-GO-API-FUNCTIONS.md`. Os adapters de `internal/evolution/client.go` oferecem `Status(ctx)` (GET read-only), `SendTextWithID`, `SendMediaWithID`. O parâmetro id correlaciona o envio e NÃO elimina ambiguidade após timeout. `SendMedia` usa base64 puro e arquivos de até 8 MiB; áudio `type=audio` é PTT na 0.7.2; confirmar transcodificação local depois de canário autorizado. Testes: `go test ./internal/evolution`. Não modificar sessão/GET admin nem fazer POST /instance/connect durante auditoria.\n
