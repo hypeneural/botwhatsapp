@@ -2,6 +2,7 @@ package outbox
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -542,5 +543,115 @@ func TestLIDWithoutPhoneMapping(t *testing.T) {
 	pending, _, _ := store.RecoverTasks()
 	if len(pending) != 0 {
 		t.Fatalf("expected 0 tasks enqueued for LID without phone, got %d", len(pending))
+	}
+}
+
+// 9. Shared Lead Claim Across Multi-Instances:
+// If customer contacts instance A and later instance B in the same local calendar day,
+// the lead claim is shared and blocks duplicate campaign dispatch.
+func TestSharedLeadClaimAcrossInstances(t *testing.T) {
+	store, dir := setupTestStore(t)
+	evo := &mockEvolutionSender{}
+	crmMock := &mockCRMScheduler{}
+	instanceID := 1
+	loc := time.FixedZone("BRT", -3*3600)
+	cfg := Config{
+		DataDir:                  dir,
+		OperationalAuthorization: true,
+		CRMInstanceID:            &instanceID,
+		Tenant:                   "estudio-evydencia",
+		Location:                 loc,
+	}
+
+	w, _ := NewWorker(cfg, store, evo, crmMock)
+
+	// Inbound message from instance A (ads)
+	d1 := core.Decision{
+		Action:     core.AdsProposal,
+		InstanceID: "uuid-instance-a",
+		MessageID:  "msg-inst-a",
+		PhoneE164:  "5548996553954",
+		CRMPhone:   "48996553954",
+		ReplyJID:   "5548996553954@s.whatsapp.net",
+	}
+
+	// Inbound message from instance B (greeting) for the same customer on the same day
+	d2 := core.Decision{
+		Action:     core.AdsProposal,
+		InstanceID: "uuid-instance-b",
+		MessageID:  "msg-inst-b",
+		PhoneE164:  "5548996553954",
+		CRMPhone:   "48996553954",
+		ReplyJID:   "5548996553954@s.whatsapp.net",
+	}
+
+	if err := w.IngestDecision(d1); err != nil {
+		t.Fatalf("ingest d1 failed: %v", err)
+	}
+	if err := w.IngestDecision(d2); err != nil {
+		t.Fatalf("ingest d2 failed: %v", err)
+	}
+
+	// Drain tasks
+	_, err := w.DrainPending(context.Background())
+	if err != nil {
+		t.Fatalf("drain failed: %v", err)
+	}
+
+	// CRM must be scheduled exactly once despite two different incoming instances
+	if crmMock.calls != 1 {
+		t.Fatalf("expected exactly 1 CRM schedule call, got %d", crmMock.calls)
+	}
+}
+
+// 10. Prune Old Tasks and Capacity Limits:
+// Confirmed tasks older than retention or exceeding capacity must be pruned safely.
+func TestPruneOldTasksAndDiskCapacity(t *testing.T) {
+	store, _ := setupTestStore(t)
+
+	// Create 5 confirmed tasks with older completed timestamps
+	now := time.Now().UTC()
+	for i := 1; i <= 5; i++ {
+		taskID := fmt.Sprintf("task-prune-%d", i)
+		tObj := Task{
+			ID:          taskID,
+			Step:        workflow.SendAdText,
+			State:       TaskConfirmed,
+			CreatedAt:   now.Add(-48 * time.Hour),
+			CompletedAt: now.Add(-time.Duration(30-i) * time.Hour),
+		}
+		raw, _ := json.Marshal(tObj)
+		_ = store.atomicWriteFile(store.tasksDir, taskID+".json", raw)
+	}
+
+	// Prune tasks older than 24h
+	deleted, err := store.PruneOldTasks(24*time.Hour, 10)
+	if err != nil {
+		t.Fatalf("prune failed: %v", err)
+	}
+	if deleted != 5 {
+		t.Fatalf("expected 5 tasks pruned by age, got %d", deleted)
+	}
+
+	// Create 10 tasks and test capacity limit of 3
+	for i := 1; i <= 10; i++ {
+		taskID := fmt.Sprintf("task-cap-%d", i)
+		tObj := Task{
+			ID:          taskID,
+			Step:        workflow.SendAdText,
+			State:       TaskConfirmed,
+			CreatedAt:   now,
+			CompletedAt: now.Add(time.Duration(i) * time.Minute),
+		}
+		raw, _ := json.Marshal(tObj)
+		_ = store.atomicWriteFile(store.tasksDir, taskID+".json", raw)
+	}
+
+	deletedCap, err := store.PruneOldTasks(0, 3)
+	if err != nil {
+		t.Fatalf("prune capacity failed: %v", err)
+	}
+	if deletedCap != 7 {
+		t.Fatalf("expected 7 tasks pruned to enforce capacity of 3, got %d", deletedCap)
 	}
 }
