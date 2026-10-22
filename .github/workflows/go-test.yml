@@ -32,3 +32,6 @@ jobs:
           cache: false
       - run: go vet ./...
       - run: go test -count=1 ./...
+      # Concurrency guard for the journal, policy updates and webhook fan-out.
+      # Runs once per code change; no network calls or production credentials.
+      - run: go test -race -count=1 ./internal/outbox ./internal/ingress ./internal/relay

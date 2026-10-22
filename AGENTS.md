@@ -34,9 +34,9 @@ O script NÃO acessa VPS, não executa `docker compose up/down` nem chama APIs r
 
 ## Fluxo CTWA (prioridade do ciclo atual)
 - Revise `docs/CTWA-ROUTING-20261022.md` e a skill `.agents/skills/ctwa-ads-funnel/SKILL.md`. Payload da conversa de tráfego pago foi fornecido pelo gestor como relatório, sem novo acesso ao banco.
-- Editar a lista de mensagens exatas em `config/ads-triggers.txt`, carregada por `BOT_ADS_TRIGGERS_FILE`. Não usar match genérico, regex ou substring para acionar campanha CRM.
+- A lista de mensagens exatas em `config/ads-triggers.txt` já contém **duas frases reais** (Primeiro Natal e Natal em Tijucas); editar novas frases somente quando comprovadas em criativo ou aprovadas, carregada por `BOT_ADS_TRIGGERS_FILE`. Não usar match genérico, regex ou substring para acionar campanha CRM.
 - O registro Ads agora propaga `AdsFallback`, e mensagens não correspondentes recebem saudação/menu no **MESMO** número de anúncios; greeting futuro em instância independente só faz saudação.
-- Funil Ads: texto com `{{nome}}` seguro, PTT, imagem opcional, vídeo MP4 opcional, CRM 416 SEM NOME por último, com dependência durável de execução. Não interpretar `uncertain` como confirmação de entrega.
+- Funil Ads: texto com `{{nome}}` seguro, PTT, imagem opcional, vídeo MP4 opcional, CRM 416 SEM NOME por último, com dependência durável de execução. `BOT_ADS_FLOW_COOLDOWN_HOURS` padrão 24h bloqueia nova sequência do mesmo contato e preserva `PARAR`/pausa humana por atualizações atômicas de contato. Não interpretar `uncertain` como confirmação de entrega.
 - O relatório de webhook anexado expôs material como `instanceToken`: NÃO COMMITAR O JSON BRUTO e solicitar verificação/rotação do token se ainda válido.
 - Mídias reais não estão incluídas: flags comerciais OFF, nada de disparos reais, CRM somente leitura.
 
@@ -51,3 +51,13 @@ O script NÃO acessa VPS, não executa `docker compose up/down` nem chama APIs r
 Fontes upstream: https://go.dev/doc/devel/release ; https://www.alpinelinux.org/releases/ ; https://docs.docker.com/compose/how-tos/networking/ ; https://github.com/evolution-foundation/evolution-go/tree/0.7.2 .
 
 **A próxima ação do Antigravity é SÓ VALIDAR LOCALMENTE.** Não ligar saída, parear instâncias ou mudar o webhook.
+
+## Padronização do repositório (First AI, 22/10)
+- **Uma fonte da verdade:** `config/ads-triggers.txt` para frases e `.env.example` para nomes de variáveis. `config/instances.example.yaml` é inventário de referência, não é carregado como configuração de produção.
+- O código `*.go` alterado deve passar por `gofmt` e `go vet`. Aplicar formatação SOMENTE nos arquivos modificados na PR, sem reformatar massivamente o histórico.
+- Não criar novos `walkthrough-final-vN.md` a cada rodada. Atualizar `docs/CTWA-ROUTING-20261022.md`, `docs/RELAY-ROLLOUT-GATES.md`, `docs/INDEX.md` e skills existentes quando for mudança de comportamento.
+- Para novos gatilhos de anúncios, acrescentar uma frase inteira por linha e validar `cmd/botwhatsapp/real_creatives_test.go` com casos positivos e negativos.
+- `internal/outbox/contact_update.go` deve ser a via para qualquer leitura-modificação-gravação de opt-out, humano e cooldown; NUNCA reutilizar `GetContact` + `SaveContact` com estado antigo do contato dentro do worker.
+- O funil Ads tem cooldown próprio configurável, 24h padrão (`BOT_ADS_FLOW_COOLDOWN_HOURS`), independente do cooldown de saudação. Se o primeiro contato já tentou um envio, outro clique não reinicia a série comercial durante a janela. Estados `uncertain` exigem reconciliação antes de novo envio.
+- Variantes não reconhecidas seguem apenas a saudação. Eventos exclusivamente com `@lid` e sem JID telefônico validado devem ser ignorados e contabilizados sem tentativa de enviar ao LID ou converter para CRM. NÃO supor retransmissão garantida com telefone.
+- Teste mínimo: script local único e Actions `go vet`, `go test` e `go test -race` nos módulos de concorrência. A release NÃO está autorizada por passar testes; manter separada a homologação do relay/status-engine da ativação comercial.

@@ -43,6 +43,7 @@ type Task struct {
 type ContactState struct {
 	PhoneE164      string    `json:"phone_e164"`
 	LastGreetingAt time.Time `json:"last_greeting_at,omitempty"`
+	LastAdsFlowAt time.Time `json:"last_ads_flow_at,omitempty"`
 	HumanPaused    bool      `json:"human_paused"`
 	HumanPausedAt  time.Time `json:"human_paused_at,omitempty"`
 	OptOut         bool      `json:"opt_out"`
@@ -53,6 +54,7 @@ type ContactState struct {
 type Config struct {
 	DataDir                  string
 	GreetingCooldown         time.Duration
+	AdsFlowCooldown          time.Duration
 	CRMInstanceID            *int
 	OperationalAuthorization bool
 	GreetingCaption          string

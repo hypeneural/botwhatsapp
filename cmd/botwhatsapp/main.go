@@ -164,8 +164,12 @@ func main() {
 		if len(adVideo)>0 && !(len(adVideo)>=12&&string(adVideo[4:8])=="ftyp") {
 			log.Fatal("BOT_ADS_VIDEO_FILE must be MP4 (up to 8MiB)")
 		}
+		adsCooldownHours,err:=strconv.Atoi(env("BOT_ADS_FLOW_COOLDOWN_HOURS","24"))
+		if err!=nil || adsCooldownHours<1 || adsCooldownHours>168 {
+			log.Fatal("BOT_ADS_FLOW_COOLDOWN_HOURS must be between 1 and 168")
+		}
 		cfg := outbox.Config{
-			DataDir: dataDir, GreetingCooldown: 24 * time.Hour,
+			DataDir: dataDir, GreetingCooldown: 24 * time.Hour, AdsFlowCooldown:time.Duration(adsCooldownHours)*time.Hour,
 			CRMInstanceID: crmInstanceID,
 			OperationalAuthorization: opAuth,
 			AdAudioFixture: audio, GreetingImageFixture: image,

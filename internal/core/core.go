@@ -21,6 +21,7 @@ type Envelope struct {
    Sender string `json:"Sender"`
    SenderAlt string `json:"SenderAlt"`
    IsFromMe bool `json:"IsFromMe"`
+   IsGroup bool `json:"IsGroup"`
    PushName string `json:"PushName"`
   } `json:"Info"`
   Message struct {
@@ -86,6 +87,7 @@ func CRMPhone(e164 string)(string,bool) {
 func Select(e Envelope,c Config) Decision {
  d:=Decision{Action:Ignore,InstanceID:e.InstanceID,MessageID:e.Data.Info.ID}
  if e.Event!="Message" || e.Data.Info.IsFromMe || e.Data.Info.ID=="" {d.Reason="not_new_inbound";return d}
+ if e.Data.Info.IsGroup {d.Reason="non_private_chat";return d}
  if e.InstanceID!=c.AdsUUID && e.InstanceID!=c.GreetingUUID {d.Reason="unknown_instance";return d}
  chat:=e.Data.Info.Chat
  if strings.HasSuffix(chat,"@g.us")||strings.HasSuffix(chat,"@newsletter")||strings.Contains(chat,"broadcast"){d.Reason="non_private_chat";return d}

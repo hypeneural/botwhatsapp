@@ -26,6 +26,7 @@ instances:
     response_text: "Oii! Tudo bem? 🎄❤️ Que alegria receber seu contato! Vamos enviar a proposta de Natal 2026 por outro WhatsApp oficial do Estúdio Evidência."
     audio_file: null
     fallback_menu_enabled: true
+    ads_flow_cooldown_hours: 24 # Somente exemplo documental; runtime BOT_ADS_FLOW_COOLDOWN_HOURS
     image_file: null # opcional: passo depois do áudio
     video_file: null # opcional MP4, passo depois da imagem
     image_caption_file: config/ads-image-caption.txt
