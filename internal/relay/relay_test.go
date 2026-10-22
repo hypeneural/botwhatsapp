@@ -104,3 +104,18 @@ func TestInvalidAndCapacityFailClosed(t *testing.T){
 	if _,err:=EventKey([]byte(evt1),"different");!errors.Is(err,ErrInvalid){t.Fatal(err)}
 	if deleted,err:=store.PruneCompleted(time.Now().Add(time.Hour));err!=nil||deleted!=0{t.Fatal("pending event pruned",deleted,err)}
 }
+
+func TestSpoolBytesQuota(t *testing.T){
+	dir:=t.TempDir()
+	maxBytes:=int64(len(evt1)+2048+32)
+	store,err:=NewStoreWithLimits(dir,100,maxBytes)
+	if err!=nil{t.Fatal(err)}
+	first,_:=EventKey([]byte(evt1),"uuid-ads")
+	second,_:=EventKey([]byte(evt2),"uuid-ads")
+	if ok,err:=store.Insert(first,[]byte(evt1));err!=nil||!ok{t.Fatal("first insertion",err)}
+	if ok,err:=store.Insert(second,[]byte(evt2));ok||!errors.Is(err,ErrFull){t.Fatalf("missing byte backpressure: %t %v",ok,err)}
+	fresh,err:=NewStoreWithLimits(dir,100,maxBytes)
+	if err!=nil{t.Fatal("restart quota count",err)}
+	if ok,err:=fresh.Insert(first,[]byte(evt1));ok||err!=nil{t.Fatal("existing ID should be idempotent under full quota",err)}
+	if _,err:=NewStoreWithLimits(dir,100,4095);err==nil{t.Fatal("invalid quota accepted")}
+}
