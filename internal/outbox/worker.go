@@ -33,12 +33,6 @@ func NewWorker(cfg Config, store *Store, evolution EvolutionSender, crmScheduler
 	if cfg.GreetingCaption == "" {
 		cfg.GreetingCaption = "Olá! Seja bem-vindo ao Estúdio Evidência. Escolha uma das opções abaixo para continuarmos:\n1. Natal 2026\n2. Agendamentos\n3. Fotos e pedidos\n4. Localização\n5. Falar com atendente humano"
 	}
-	if len(cfg.AdAudioFixture) == 0 {
-		cfg.AdAudioFixture = []byte("MOCK_AUDIO_FIXTURE_BYTES")
-	}
-	if len(cfg.GreetingImageFixture) == 0 {
-		cfg.GreetingImageFixture = []byte("MOCK_IMAGE_FIXTURE_BYTES")
-	}
 	if cfg.Tenant == "" {
 		cfg.Tenant = "estudio-evydencia"
 	}
@@ -79,8 +73,8 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 			if err == nil {
 				c.OptOut = true
 				c.OptOutAt = time.Now().UTC()
-				_ = w.store.SaveContact(c)
-			}
+				if err := w.store.SaveContact(c); err != nil {return err}
+			} else { return err }
 		}
 		return nil
 	}
@@ -182,16 +176,24 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 
 	// Check contact opt-out once more before starting attempt
 	contact, err := w.store.GetContact(task.PhoneE164)
-	if err == nil && contact.OptOut {
-		_, _ = w.store.UpdateTaskState(task.ID, func(t *Task) error {
+	if err != nil { return fmt.Errorf("outbox: cannot read contact policy: %w", err) }
+	if contact.OptOut || (contact.HumanPaused && task.Step != workflow.PauseHuman) {
+		_, err = w.store.UpdateTaskState(task.ID, func(t *Task) error {
 			t.State = TaskSuppressed
-			t.Error = "suppressed: contact opted out"
+			t.Error = "suppressed: contact policy (opt-out or human handoff)"
 			t.CompletedAt = time.Now().UTC()
 			return nil
 		})
-		return nil
+		return err
 	}
 
+	// Do not transmit fake/missing media; suppress BEFORE attempt_started.
+	if task.Step == workflow.SendAdAudio && len(w.cfg.AdAudioFixture) == 0 {
+		return w.recordSuppressed(task.ID, "audio asset missing: no outbound request attempted")
+	}
+	if task.Step == workflow.SendGreetingImage && len(w.cfg.GreetingImageFixture) == 0 {
+		return w.recordSuppressed(task.ID, "greeting image asset missing: no outbound request attempted")
+	}
 	// Transition ATOMICALLY to attempt_started with fsync before issuing outbound call
 	task, err = w.store.UpdateTaskState(task.ID, func(t *Task) error {
 		t.State = TaskAttemptStarted
@@ -239,7 +241,10 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 		}
 		// Record successful greeting timestamp on contact
 		contact.LastGreetingAt = time.Now().UTC()
-		_ = w.store.SaveContact(contact)
+		if err := w.store.SaveContact(contact); err != nil {
+			// Media was already sent; do not retry on contact state persistence failure.
+			return w.recordUncertain(task.ID, "greeting sent; contact cooldown persistence failed")
+		}
 		return w.recordConfirmed(task.ID, extID)
 
 	case workflow.SendMenuReply:
@@ -255,7 +260,9 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 	case workflow.PauseHuman:
 		contact.HumanPaused = true
 		contact.HumanPausedAt = time.Now().UTC()
-		_ = w.store.SaveContact(contact)
+		if err := w.store.SaveContact(contact); err != nil {
+			return w.recordUncertain(task.ID, "human pause persistence failed")
+		}
 		return w.recordConfirmed(task.ID, "internal-pause-applied")
 
 	default:
