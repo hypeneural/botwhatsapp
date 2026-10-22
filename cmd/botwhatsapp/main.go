@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -24,173 +25,200 @@ func env(k, def string) string {
 	return def
 }
 
+func readAsset(envKey string) []byte {
+	path := strings.TrimSpace(os.Getenv(envKey))
+	if path == "" {
+		return nil // No fixture is ever substituted for a missing real file.
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		log.Fatalf("configured media file for %s is unavailable", envKey)
+	}
+	if len(b) == 0 || len(b) > 8<<20 {
+		log.Fatalf("configured media file for %s has an invalid size", envKey)
+	}
+	return b
+}
+
 func main() {
 	enabled := os.Getenv("BOT_ENABLED") == "true"
 	outboundEnabled := os.Getenv("BOT_OUTBOUND_ENABLED") == "true"
+	opAuth := os.Getenv("BOT_OPERATIONAL_AUTHORIZATION") == "true"
+	if outboundEnabled && (!enabled || !opAuth) {
+		log.Fatal("outbound must have BOT_ENABLED=true and BOT_OPERATIONAL_AUTHORIZATION=true")
+	}
 	dataDir := env("BOT_DATA_DIR", "./data/spool")
+	adsUUID := strings.TrimSpace(os.Getenv("BOT_ADS_INSTANCE_UUID"))
+	greetingUUID := strings.TrimSpace(os.Getenv("BOT_GREETING_INSTANCE_UUID"))
 
-	triggers := []string{"Quero a proposta de Natal 2026", "proposta de natal", "natal 2026"}
-	if s := strings.TrimSpace(os.Getenv("BOT_ADS_TRIGGERS")); s != "" {
-		triggers = nil
-		for _, x := range strings.Split(s, "|") {
-			if x = strings.TrimSpace(x); x != "" {
-				triggers = append(triggers, x)
-			}
+	triggers := []string{}
+	// Never infer a Meta Ads trigger from vague phrases in source code.
+	for _, x := range strings.Split(os.Getenv("BOT_ADS_TRIGGERS"), "|") {
+		if x = strings.TrimSpace(x); x != "" {
+			triggers = append(triggers, x)
 		}
 	}
 
-	adsUUID := os.Getenv("BOT_ADS_INSTANCE_UUID")
-	greetingUUID := os.Getenv("BOT_GREETING_INSTANCE_UUID")
-	adsSecret := os.Getenv("BOT_ADS_WEBHOOK_SECRET")
-	greetingSecret := os.Getenv("BOT_GREETING_WEBHOOK_SECRET")
-
-	// Multi-instance Registry configuration
-	var reg *instances.Registry
-	secretsMap := make(map[string]string)
-	if adsUUID != "" && greetingUUID != "" {
-		defs := []instances.Definition{
-			{
-				Slug:              "ads",
-				InstanceUUID:      adsUUID,
-				BusinessPhoneE164: env("BOT_ADS_PHONE", "554832200440"),
-				Role:              instances.Ads,
-				Enabled:           true,
-				TokenEnv:          "EVOLUTION_ADS_APIKEY",
-				WebhookSecretEnv:  "BOT_ADS_WEBHOOK_SECRET",
-				AdsTriggers:       triggers,
-				CRMAllowed:        true,
-			},
-			{
-				Slug:              "greeting",
-				InstanceUUID:      greetingUUID,
-				BusinessPhoneE164: env("BOT_GREETING_PHONE", "5548996425287"),
-				Role:              instances.Greeting,
-				Enabled:           true,
-				TokenEnv:          "EVOLUTION_GREETING_APIKEY",
-				WebhookSecretEnv:  "BOT_GREETING_WEBHOOK_SECRET",
-			},
+	defs := make([]instances.Definition, 0, 2)
+	secrets := make(map[string]string)
+	senders := make(map[string]outbox.EvolutionSender)
+	evoBaseURL := env("EVOLUTION_GO_BASE_URL", "https://wa-api.etijucas.com.br")
+	if adsUUID != "" {
+		defs = append(defs, instances.Definition{
+			Slug: "ads", InstanceUUID: adsUUID,
+			BusinessPhoneE164: env("BOT_ADS_PHONE", "554832200440"),
+			Role: instances.Ads, Enabled: true, TokenEnv: "EVOLUTION_ADS_APIKEY",
+			WebhookSecretEnv: "BOT_ADS_WEBHOOK_SECRET",
+			AdsTriggers: triggers, CRMAllowed: true,
+		})
+		secrets["ads"] = os.Getenv("BOT_ADS_WEBHOOK_SECRET")
+		if outboundEnabled {
+			token := os.Getenv("EVOLUTION_ADS_APIKEY")
+			if token == "" {
+				log.Fatal("outbound ads instance requires EVOLUTION_ADS_APIKEY")
+			}
+			senders[adsUUID] = evolution.Client{BaseURL: evoBaseURL, Token: token}
 		}
+	}
+	if greetingUUID != "" {
+		defs = append(defs, instances.Definition{
+			Slug: "greeting", InstanceUUID: greetingUUID,
+			BusinessPhoneE164: env("BOT_GREETING_PHONE", "5548996425287"),
+			Role: instances.Greeting, Enabled: true, TokenEnv: "EVOLUTION_GREETING_APIKEY",
+			WebhookSecretEnv: "BOT_GREETING_WEBHOOK_SECRET",
+		})
+		secrets["greeting"] = os.Getenv("BOT_GREETING_WEBHOOK_SECRET")
+		if outboundEnabled {
+			token := os.Getenv("EVOLUTION_GREETING_APIKEY")
+			if token == "" {
+				log.Fatal("outbound greeting instance requires EVOLUTION_GREETING_APIKEY")
+			}
+			senders[greetingUUID] = evolution.Client{BaseURL: evoBaseURL, Token: token}
+		}
+	}
+	var reg *instances.Registry
+	if len(defs) > 0 {
 		var err error
 		reg, err = instances.New(defs)
 		if err != nil {
-			log.Printf("warning: multi-instance registry init: %v (falling back to legacy routing)", err)
-		} else {
-			secretsMap["ads"] = adsSecret
-			secretsMap["greeting"] = greetingSecret
+			// Never fall back to legacy routing on a failed registry.
+			log.Fatalf("invalid multi-instance registry: %v", err)
 		}
 	}
-
+	if enabled && reg == nil {
+		log.Fatal("BOT_ENABLED requires at least one explicitly mapped Evolution Go instance")
+	}
+	for slug, secret := range secrets {
+		if enabled && len(secret) < 32 {
+			log.Fatalf("webhook for role %s requires a 32+ character secret", slug)
+		}
+	}
 	coreCfg := core.Config{
-		AdsUUID:      adsUUID,
-		GreetingUUID: greetingUUID,
-		AdsTriggers:  triggers,
-		AdsFallback:  os.Getenv("BOT_ADS_FALLBACK_MENU") == "true",
+		AdsUUID: adsUUID, GreetingUUID: greetingUUID, AdsTriggers: triggers,
+		AdsFallback: os.Getenv("BOT_ADS_FALLBACK_MENU") == "true",
 	}
 
 	var worker *outbox.Worker
 	if outboundEnabled {
 		store, err := outbox.NewStore(dataDir)
 		if err != nil {
-			log.Fatalf("outbox store init error: %v", err)
+			log.Fatal("cannot initialize durable outbox: ", err)
 		}
-
-		evoClient := evolution.Client{
-			BaseURL: env("EVOLUTION_GO_BASE_URL", "https://wa-api.etijucas.com.br"),
-			Token:   os.Getenv("EVOLUTION_ADS_APIKEY"),
-		}
-
-		crmClient := crm.Client{
-			BaseURL:       env("EVIDENCIA_CRM_BASE_URL", "https://evydencia.com"),
-			Authorization: os.Getenv("EVIDENCIA_CRM_AUTHORIZATION"),
-		}
-
 		var crmInstanceID *int
-		if idStr := os.Getenv("EVIDENCIA_CRM_OUTBOUND_MESSAGE_INSTANCE_ID"); idStr != "" {
-			if id, err := strconv.Atoi(idStr); err == nil && id > 0 {
-				crmInstanceID = &id
-			}
+		if id, err := strconv.Atoi(os.Getenv("EVIDENCIA_CRM_OUTBOUND_MESSAGE_INSTANCE_ID")); err == nil && id > 0 {
+			crmInstanceID = &id
 		}
-
-		opAuth := os.Getenv("BOT_OPERATIONAL_AUTHORIZATION") == "true"
-
-		var audioFixture []byte
-		audioPath := env("BOT_ADS_AUDIO_FILE", "testdata/test_audio.ogg")
-		if b, err := os.ReadFile(audioPath); err == nil && len(b) > 0 {
-			audioFixture = b
+		if adsUUID != "" && crmInstanceID == nil {
+			log.Fatal("ads CRM dispatch requires explicit positive EVIDENCIA_CRM_OUTBOUND_MESSAGE_INSTANCE_ID")
 		}
-
 		loc, err := time.LoadLocation("America/Sao_Paulo")
 		if err != nil {
-			loc = time.FixedZone("BRT", -3*3600)
+			log.Fatal("America/Sao_Paulo timezone is required for shared CRM claim")
 		}
-
-		outboxCfg := outbox.Config{
-			DataDir:                  dataDir,
-			GreetingCooldown:         24 * time.Hour,
-			CRMInstanceID:            crmInstanceID,
+		crmClient := crm.Client{
+			BaseURL: env("EVIDENCIA_CRM_BASE_URL", "https://evydencia.com"),
+			Authorization: os.Getenv("EVIDENCIA_CRM_AUTHORIZATION"),
+		}
+		audio := readAsset("BOT_ADS_AUDIO_FILE")
+		image := readAsset("BOT_GREETING_IMAGE_FILE")
+		// Validate configured files before allowing live media. Explicitly
+		// missing files remain suppressed by the outbox; never send a fake.
+		if len(audio) > 0 && (!strings.HasPrefix(string(audio), "OggS") || !strings.Contains(string(audio[:min(len(audio), 128)]), "OpusHead")) {
+			log.Fatal("BOT_ADS_AUDIO_FILE must be OGG Opus/WhatsApp PTT")
+		}
+		if len(image) > 0 && !(strings.HasPrefix(string(image), "\x89PNG\r\n\x1a\n") ||
+			(len(image) >= 3 && image[0] == 0xff && image[1] == 0xd8 && image[2] == 0xff)) {
+			log.Fatal("BOT_GREETING_IMAGE_FILE must be PNG or JPEG")
+		}
+		cfg := outbox.Config{
+			DataDir: dataDir, GreetingCooldown: 24 * time.Hour,
+			CRMInstanceID: crmInstanceID,
 			OperationalAuthorization: opAuth,
-			AdAudioFixture:           audioFixture,
-			AdWelcomeText:            env("BOT_ADS_RESPONSE_TEXT", "Oii! Tudo bem? 🎄❤️ Que alegria receber seu contato! Vamos enviar a proposta de Natal 2026 por outro WhatsApp oficial do Estúdio Evidência."),
-			Tenant:                   env("BOT_TENANT", "estudio-evydencia"),
-			Location:                 loc,
-			TaskRetention:            7 * 24 * time.Hour,
-			MaxTasksCount:            10000,
+			AdAudioFixture: audio, GreetingImageFixture: image,
+			AdWelcomeText: env("BOT_ADS_RESPONSE_TEXT", "Oii! Tudo bem? 🎄❤️ Que alegria receber seu contato! Vamos encaminhar sua proposta de Natal 2026 por outro WhatsApp oficial do Estúdio Evidência."),
+			Tenant: env("BOT_TENANT", "estudio-evydencia"),
+			Location: loc, TaskRetention: 7 * 24 * time.Hour,
+			MaxTasksCount: 10000, Senders: senders,
 		}
-
-		worker, err = outbox.NewWorker(outboxCfg, store, evoClient, crmClient)
+		if path := os.Getenv("BOT_GREETING_CAPTION_FILE"); path != "" {
+			raw, err := os.ReadFile(path)
+			if err != nil || strings.TrimSpace(string(raw)) == "" {
+				log.Fatal("BOT_GREETING_CAPTION_FILE must contain text")
+			}
+			cfg.GreetingCaption = string(raw)
+		}
+		worker, err = outbox.NewWorker(cfg, store, nil, crmClient)
 		if err != nil {
-			log.Fatalf("outbox worker init error: %v", err)
+			log.Fatal("outbox worker init: ", err)
 		}
+	}
 
-		// Run background consumer loop
+	var onDecision func(core.Decision) error
+	if worker != nil {
+		onDecision = func(d core.Decision) error {
+			err := worker.IngestDecision(d)
+			if errors.Is(err, outbox.ErrEventDuplicate) {
+				return nil
+			}
+			if err != nil {
+				log.Printf("durable decision ingestion unavailable: %T", err)
+			}
+			return err
+		}
+	}
+	// Preview mode never enqueues production tasks. In outbound mode it must
+	// synchronously persist tasks BEFORE the webhook returns HTTP 202.
+	h, err := ingress.New(ingress.Settings{
+		Enabled: enabled, AdsSecret: secrets["ads"],
+		GreetingSecret: secrets["greeting"],
+		SpoolDir: dataDir, Core: coreCfg, OnDecision: onDecision,
+		Registry: reg, Secrets: secrets,
+	})
+	if err != nil {
+		log.Fatalf("invalid webhook configuration: %v", err)
+	}
+
+	if worker != nil {
+		// One bounded runner. Scan on startup and every 15s, not every 500ms.
+		// The durable journal remains the source of truth after a restart.
 		go func() {
-			log.Println("durable outbox worker started in background")
+			ticker := time.NewTicker(15 * time.Second)
+			defer ticker.Stop()
 			for {
 				if _, err := worker.DrainPending(context.Background()); err != nil {
-					log.Printf("worker drain error: %v", err)
+					log.Printf("outbox drain failed: %T", err)
 				}
-				time.Sleep(500 * time.Millisecond)
+				<-ticker.C
 			}
 		}()
 	}
-
-	var onDecision func(core.Decision)
-	if worker != nil {
-		onDecision = func(d core.Decision) {
-			if err := worker.IngestDecision(d); err != nil {
-				log.Printf("outbox ingest decision error: %v", err)
-			}
-		}
-	}
-
-	ingressSettings := ingress.Settings{
-		Enabled:        enabled,
-		AdsSecret:      adsSecret,
-		GreetingSecret: greetingSecret,
-		SpoolDir:       dataDir,
-		Core:           coreCfg,
-		OnDecision:     onDecision,
-	}
-	if reg != nil && len(secretsMap["ads"]) >= 32 && len(secretsMap["greeting"]) >= 32 {
-		ingressSettings.Registry = reg
-		ingressSettings.Secrets = secretsMap
-	}
-
-	h, err := ingress.New(ingressSettings)
-	if err != nil {
-		log.Fatalf("configuration invalid: %v", err)
-	}
-
-	addr := env("BOT_LISTEN_ADDR", "0.0.0.0:8788")
-	log.Printf("webhook intake listening on %s; enabled=%t outbound=%t", addr, enabled, outboundEnabled)
+	addr := env("BOT_LISTEN_ADDR", "127.0.0.1:8788")
+	log.Printf("bot started: enabled=%t outbound=%t listen=%s", enabled, outboundEnabled, addr)
 	srv := &http.Server{
-		Addr:              addr,
-		Handler:           h,
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      10 * time.Second,
-		IdleTimeout:       30 * time.Second,
-		MaxHeaderBytes:    8192,
+		Addr: addr, Handler: h,
+		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second,
+		WriteTimeout: 10 * time.Second, IdleTimeout: 30 * time.Second,
+		MaxHeaderBytes: 8192,
 	}
 	log.Fatal(srv.ListenAndServe())
 }
