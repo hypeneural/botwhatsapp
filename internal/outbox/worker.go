@@ -118,7 +118,10 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 		if err := w.store.SaveContact(contact); err != nil { return err }
 	}
 	// 5. Create workflow plan and enqueue tasks
-	plan := workflow.Create(d)
+	plan := workflow.CreateWithOptions(d,workflow.Options{
+		AdImage:len(w.cfg.AdImageFixture)>0,AdVideo:len(w.cfg.AdVideoFixture)>0,
+		GreetingImage:len(w.cfg.GreetingImageFixture)>0,
+	})
 	if len(plan.Steps) == 0 {
 		return nil
 	}
@@ -126,10 +129,12 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 	eventKey, err := instances.EventKey(d.InstanceID, "Message", d.MessageID)
 	if err != nil {return err}
 	tasks := make([]Task, 0, len(plan.Steps))
+	var previousID string
 	for idx, step := range plan.Steps {
 		taskID := fmt.Sprintf("%s-%02d-%s", eventKey, idx, step)
 		task := Task{
 			ID:           taskID,
+			PreviousTaskID: previousID,
 			EventKey:     eventKey,
 			InstanceID:   d.InstanceID,
 			RecipientJID: d.ReplyJID,
@@ -144,14 +149,21 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 
 		switch step {
 		case workflow.SendAdText:
-			task.PayloadText = w.cfg.AdWelcomeText
+			task.PayloadText = personalize(w.cfg.AdWelcomeText,d.Name)
+		case workflow.SendAdImage:
+			task.PayloadCaption = w.cfg.AdImageCaption
+		case workflow.SendAdVideo:
+			task.PayloadCaption = w.cfg.AdVideoCaption
 		case workflow.SendGreetingImage:
 			task.PayloadCaption = w.cfg.GreetingCaption
+		case workflow.SendGreetingText:
+			task.PayloadText = w.cfg.GreetingCaption
 		case workflow.SendMenuReply:
 			task.PayloadText = plan.Message
 		}
 
 		tasks = append(tasks, task)
+		previousID=taskID
 	}
 	// Commit all tasks and the dedup marker in one serialized disk operation.
 	// On failure, the marker is not committed so the webhook can retry safely.
@@ -177,6 +189,14 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 		// Never re-process tasks that are already attempt_started, confirmed, or uncertain.
 		return nil
 	}
+	// Preserve the configured order even when recovery or queue scheduling
+	// observes tasks out of order. Previous stage may be confirmed, uncertain
+	// or suppressed; those are terminal and do not silently replay.
+	if task.PreviousTaskID!="" {
+		prev,err:=w.store.GetTask(task.PreviousTaskID)
+		if err!=nil {return fmt.Errorf("outbox: preceding task missing/unreadable: %w",err)}
+		if prev.State==TaskPending || prev.State==TaskAttemptStarted {return nil}
+	}
 
 	// Check contact opt-out once more before starting attempt
 	contact, err := w.store.GetContact(task.PhoneE164)
@@ -193,7 +213,7 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 
 	// Last defense against multiple greetings queued before the first image
 	// was actually sent (ingress cooldown alone is insufficient).
-	if task.Step == workflow.SendGreetingImage && !workflow.IsGreetingDue(
+	if (task.Step==workflow.SendGreetingImage || task.Step==workflow.SendGreetingText) && !workflow.IsGreetingDue(
 		contact.LastGreetingAt,time.Now().UTC(),w.cfg.GreetingCooldown,contact.HumanPaused) {
 		return w.recordSuppressed(task.ID,"greeting cooldown not elapsed at send time")
 	}
@@ -203,6 +223,12 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 	}
 	if task.Step == workflow.SendGreetingImage && len(w.cfg.GreetingImageFixture) == 0 {
 		return w.recordSuppressed(task.ID, "greeting image asset missing: no outbound request attempted")
+	}
+	if task.Step == workflow.SendAdImage && len(w.cfg.AdImageFixture)==0 {
+		return w.recordSuppressed(task.ID,"ad image unavailable: no outbound request attempted")
+	}
+	if task.Step == workflow.SendAdVideo && len(w.cfg.AdVideoFixture)==0 {
+		return w.recordSuppressed(task.ID,"ad video unavailable: no outbound request attempted")
 	}
 	// Transition ATOMICALLY to attempt_started with fsync before issuing outbound call
 	task, err = w.store.UpdateTaskState(task.ID, func(t *Task) error {
@@ -244,6 +270,16 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 		}
 		return w.recordConfirmed(task.ID, extID)
 
+	case workflow.SendAdImage:
+		if sender==nil{return w.recordUncertain(task.ID,"evolution sender not configured")}
+		id,err:=sender.SendMedia(ctx,task.RecipientJID,"image",w.cfg.AdImageFixture,task.PayloadCaption)
+		if err!=nil{return w.recordUncertain(task.ID,err.Error())}
+		return w.recordConfirmed(task.ID,id)
+	case workflow.SendAdVideo:
+		if sender==nil{return w.recordUncertain(task.ID,"evolution sender not configured")}
+		id,err:=sender.SendMedia(ctx,task.RecipientJID,"video",w.cfg.AdVideoFixture,task.PayloadCaption)
+		if err!=nil{return w.recordUncertain(task.ID,err.Error())}
+		return w.recordConfirmed(task.ID,id)
 	case workflow.ScheduleNatal:
 		return w.executeScheduleNatal(ctx, task)
 
@@ -262,6 +298,17 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 			return w.recordUncertain(task.ID, "greeting sent; contact cooldown persistence failed")
 		}
 		return w.recordConfirmed(task.ID, extID)
+
+
+	case workflow.SendGreetingText:
+		if sender==nil{return w.recordUncertain(task.ID,"evolution sender not configured")}
+		id,err:=sender.SendText(ctx,task.RecipientJID,task.PayloadText)
+		if err!=nil{return w.recordUncertain(task.ID,err.Error())}
+		contact.LastGreetingAt=time.Now().UTC()
+		if err:=w.store.SaveContact(contact);err!=nil{
+			return w.recordUncertain(task.ID,"text greeting sent; cooldown persistence failed")
+		}
+		return w.recordConfirmed(task.ID,id)
 
 	case workflow.SendMenuReply:
 		if sender == nil {

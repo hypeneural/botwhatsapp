@@ -32,6 +32,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate-local.ps1
 ```
 O script NÃO acessa VPS, não executa `docker compose up/down` nem chama APIs reais. Preserve trabalho local; nunca `git reset --hard`, `git clean -fd` ou force-push.
 
+## Fluxo CTWA (prioridade do ciclo atual)
+- Revise `docs/CTWA-ROUTING-20261022.md` e a skill `.agents/skills/ctwa-ads-funnel/SKILL.md`. Payload da conversa de tráfego pago foi fornecido pelo gestor como relatório, sem novo acesso ao banco.
+- Editar a lista de mensagens exatas em `config/ads-triggers.txt`, carregada por `BOT_ADS_TRIGGERS_FILE`. Não usar match genérico, regex ou substring para acionar campanha CRM.
+- O registro Ads agora propaga `AdsFallback`, e mensagens não correspondentes recebem saudação/menu no **MESMO** número de anúncios; greeting futuro em instância independente só faz saudação.
+- Funil Ads: texto com `{{nome}}` seguro, PTT, imagem opcional, vídeo MP4 opcional, CRM 416 SEM NOME por último, com dependência durável de execução. Não interpretar `uncertain` como confirmação de entrega.
+- O relatório de webhook anexado expôs material como `instanceToken`: NÃO COMMITAR O JSON BRUTO e solicitar verificação/rotação do token se ainda válido.
+- Mídias reais não estão incluídas: flags comerciais OFF, nada de disparos reais, CRM somente leitura.
+
 ## Documentação por prioridade
 1. `docs/PRODUCTION-PREFLIGHT-20261022.md`
 2. `docs/RELAY-ROLLOUT-GATES.md`

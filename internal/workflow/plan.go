@@ -11,8 +11,11 @@ type Step string
 const (
  SendAdText Step="send_ad_text"
  SendAdAudio Step="send_ad_audio"
+ SendAdImage Step="send_ad_image_caption"
+ SendAdVideo Step="send_ad_video_caption"
  ScheduleNatal Step="schedule_natal_crm"
  SendGreetingImage Step="send_greeting_image_caption"
+ SendGreetingText Step="send_greeting_text_menu"
  SendMenuReply Step="send_menu_reply"
  PauseHuman Step="pause_for_human"
 )
@@ -20,12 +23,25 @@ type Plan struct {
  Steps []Step `json:"steps"`
  Message string `json:"message,omitempty"`
 }
-func Create(d core.Decision) Plan {
+// Options controls optional visual stages. A missing image/video is NOT a
+// dummy asset or a missing CRM prerequisite.
+type Options struct {
+ AdImage bool
+ AdVideo bool
+ GreetingImage bool
+}
+func Create(d core.Decision) Plan {return CreateWithOptions(d,Options{GreetingImage:true})}
+func CreateWithOptions(d core.Decision,o Options) Plan {
  switch d.Action {
  case core.AdsProposal:
-  return Plan{Steps:[]Step{SendAdText,SendAdAudio,ScheduleNatal}}
+  steps:=[]Step{SendAdText,SendAdAudio}
+  if o.AdImage {steps=append(steps,SendAdImage)}
+  if o.AdVideo {steps=append(steps,SendAdVideo)}
+  steps=append(steps,ScheduleNatal)
+  return Plan{Steps:steps}
  case core.Greeting:
-  return Plan{Steps:[]Step{SendGreetingImage}}
+  if o.GreetingImage {return Plan{Steps:[]Step{SendGreetingImage}}}
+  return Plan{Steps:[]Step{SendGreetingText}}
  case core.MenuOption:
   if d.Option=="5" {return Plan{Steps:[]Step{SendMenuReply,PauseHuman},Message:Reply("5")}}
   return Plan{Steps:[]Step{SendMenuReply},Message:Reply(d.Option)}

@@ -27,6 +27,7 @@ type Task struct {
 	PhoneE164        string        `json:"phone_e164"`
 	CRMPhone         string        `json:"crm_phone,omitempty"`
 	ContactName      string        `json:"contact_name,omitempty"`
+	PreviousTaskID string `json:"previous_task_id,omitempty"`
 	Step             workflow.Step `json:"step"`
 	AllowOnHumanPause bool `json:"allow_on_human_pause,omitempty"`
 	State            TaskState     `json:"state"`
@@ -57,6 +58,10 @@ type Config struct {
 	GreetingCaption          string
 	AdWelcomeText            string
 	AdAudioFixture           []byte
+	AdImageFixture           []byte
+	AdVideoFixture           []byte
+	AdImageCaption           string
+	AdVideoCaption           string
 	GreetingImageFixture     []byte
 	// When set, never fall back to a shared token/sender for another UUID.
 	Senders                  map[string]EvolutionSender

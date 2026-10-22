@@ -1,0 +1,24 @@
+{
+  "event": "Message",
+  "instanceId": "ads-uuid",
+  "instanceName": "ads-synthetic",
+  "data": {
+    "Info": {
+      "ID": "synthetic-ctwa-001",
+      "Chat": "5548999999999@s.whatsapp.net",
+      "Sender": "5548999999999@s.whatsapp.net",
+      "SenderAlt": "synthetic-identifier@lid",
+      "PushName": "Cliente🍀",
+      "IsFromMe": false
+    },
+    "Message": {
+      "extendedTextMessage": {
+        "text": "Quero conhecer os pacotes do Primeiro Natal em Tijucas",
+        "contextInfo": {
+          "externalAdReply": {"sourceApp": "instagram", "sourceType": "ad", "sourceID": "synthetic-ad"}
+        }
+      }
+    },
+    "referral": {"sourceApp": "instagram", "sourceType": "ad"}
+  }
+}

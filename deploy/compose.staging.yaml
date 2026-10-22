@@ -20,12 +20,16 @@ services:
         required: false
     environment:
       BOT_LISTEN_ADDR: "0.0.0.0:8788"
+      BOT_ADS_TRIGGERS_FILE: "/app/config/ads-triggers.txt"
+      BOT_ADS_IMAGE_CAPTION_FILE: "/app/config/ads-image-caption.txt"
+      BOT_GREETING_CAPTION_FILE: "/app/config/greeting-caption.txt"
       BOT_ENABLED: "false"
       BOT_OUTBOUND_ENABLED: "false"
       BOT_OPERATIONAL_AUTHORIZATION: "false"
       BOT_DATA_DIR: "/var/lib/botwhatsapp/spool"
     volumes:
       - botwhatsapp_data:/var/lib/botwhatsapp/spool
+      - ../config:/app/config:ro
     networks:
       - evolution_internal
       - edge

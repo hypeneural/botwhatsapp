@@ -73,7 +73,7 @@ func (c Client) SendMedia(ctx context.Context,phone,mediaType string,file []byte
  return c.SendMediaWithID(ctx,phone,mediaType,file,caption,"")
 }
 func (c Client) SendMediaWithID(ctx context.Context,phone,mediaType string,file []byte,caption,id string)(string,error){
- if phone==""||(mediaType!="image"&&mediaType!="audio")||len(file)==0||len(file)>8<<20{return "",ErrInvalid}
+ if phone==""||(mediaType!="image"&&mediaType!="audio"&&mediaType!="video")||len(file)==0||len(file)>8<<20{return "",ErrInvalid}
  p:=map[string]string{"number":phone,"type":mediaType,"url":base64.StdEncoding.EncodeToString(file),"caption":caption}
  if id!=""{p["id"]=id}
  return c.send(ctx,"/send/media",p)
