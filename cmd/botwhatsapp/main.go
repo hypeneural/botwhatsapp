@@ -199,16 +199,33 @@ func main() {
 	}
 
 	if worker != nil {
-		// One bounded runner. Scan on startup and every 15s, not every 500ms.
-		// The durable journal remains the source of truth after a restart.
+		// One bounded runner: prompt notifications for new tasks, a slow
+		// recovery sweep for dropped notifications/restarts, and separate
+		// maintenance. Never scan every task 2 times per second.
 		go func() {
-			ticker := time.NewTicker(15 * time.Second)
-			defer ticker.Stop()
+			ctx := context.Background()
+			if _, err := worker.DrainPending(ctx); err != nil {
+				log.Printf("initial outbox recovery unavailable: %T", err)
+			}
+			recovery := time.NewTicker(60 * time.Second)
+			maintenance := time.NewTicker(6 * time.Hour)
+			defer recovery.Stop()
+			defer maintenance.Stop()
 			for {
-				if _, err := worker.DrainPending(context.Background()); err != nil {
-					log.Printf("outbox drain failed: %T", err)
+				select {
+				case task := <-worker.PendingTasks():
+					if err := worker.ProcessTask(ctx, task.ID); err != nil {
+						log.Printf("outbox task failed: %T", err)
+					}
+				case <-recovery.C:
+					if _, err := worker.DrainPending(ctx); err != nil {
+						log.Printf("outbox recovery unavailable: %T", err)
+					}
+				case <-maintenance.C:
+					if _, err := worker.PruneCompleted(); err != nil {
+						log.Printf("outbox maintenance unavailable: %T", err)
+					}
 				}
-				<-ticker.C
 			}
 		}()
 	}
