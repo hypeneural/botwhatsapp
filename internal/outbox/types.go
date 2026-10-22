@@ -28,6 +28,7 @@ type Task struct {
 	CRMPhone         string        `json:"crm_phone,omitempty"`
 	ContactName      string        `json:"contact_name,omitempty"`
 	Step             workflow.Step `json:"step"`
+	AllowOnHumanPause bool `json:"allow_on_human_pause,omitempty"`
 	State            TaskState     `json:"state"`
 	PayloadText      string        `json:"payload_text,omitempty"`
 	PayloadCaption   string        `json:"payload_caption,omitempty"`
