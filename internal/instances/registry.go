@@ -39,6 +39,7 @@ type Definition struct {
  TokenEnv string
  WebhookSecretEnv string
  AdsTriggers []string
+ AdsFallback bool // Greeting on unmatched text for ads-number
  CRMAllowed bool
 }
 type Registry struct {
@@ -111,6 +112,7 @@ func (r *Registry) Decide(e core.Envelope) (core.Decision,error){
  case Ads:
   cfg.AdsUUID=d.InstanceUUID
   cfg.AdsTriggers=d.AdsTriggers
+  cfg.AdsFallback=d.AdsFallback
  case Greeting:
   cfg.GreetingUUID=d.InstanceUUID
  default:
