@@ -57,6 +57,8 @@ type Config struct {
 	AdWelcomeText            string
 	AdAudioFixture           []byte
 	GreetingImageFixture     []byte
+	// When set, never fall back to a shared token/sender for another UUID.
+	Senders                  map[string]EvolutionSender
 	Tenant                   string
 	Location                 *time.Location
 	TaskRetention            time.Duration
