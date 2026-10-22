@@ -4,6 +4,8 @@ on:
     paths:
       - 'Dockerfile'
       - 'Dockerfile.relay'
+      - 'config/**'
+      - 'testdata/**'
       - 'deploy/**'
       - '.github/workflows/container-build.yml'
   workflow_dispatch:
