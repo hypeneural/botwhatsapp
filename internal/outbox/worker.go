@@ -39,6 +39,22 @@ func NewWorker(cfg Config, store *Store, evolution EvolutionSender, crmScheduler
 	if len(cfg.GreetingImageFixture) == 0 {
 		cfg.GreetingImageFixture = []byte("MOCK_IMAGE_FIXTURE_BYTES")
 	}
+	if cfg.Tenant == "" {
+		cfg.Tenant = "estudio-evydencia"
+	}
+	if cfg.Location == nil {
+		loc, err := time.LoadLocation("America/Sao_Paulo")
+		if err != nil {
+			loc = time.FixedZone("BRT", -3*3600)
+		}
+		cfg.Location = loc
+	}
+	if cfg.TaskRetention <= 0 {
+		cfg.TaskRetention = 7 * 24 * time.Hour
+	}
+	if cfg.MaxTasksCount <= 0 {
+		cfg.MaxTasksCount = 10000
+	}
 
 	w := &Worker{
 		cfg:       cfg,
@@ -263,10 +279,8 @@ func (w *Worker) executeScheduleNatal(ctx context.Context, task Task) error {
 		return w.recordSuppressed(task.ID, "crm: invalid phone format (must be DDD + 8/9 digits without 55)")
 	}
 
-	// 4. Deduplicate lead claim: 1 claim per phone, campaign and time window (e.g. daily window)
-	window := time.Now().UTC().Format("2006-01-02")
-	campaignName := "natal-2026"
-	claimed, err := w.store.ClaimLead(task.PhoneE164, campaignName, window)
+	// 4. Deduplicate lead claim: shared across all instances of the tenant for campaign 416 in local BRT day
+	claimed, err := w.store.ClaimLeadShared(w.cfg.Tenant, task.CRMPhone, crm.WithoutName, time.Now(), w.cfg.Location)
 	if err != nil {
 		return w.recordUncertain(task.ID, fmt.Sprintf("lead claim check error: %v", err))
 	}

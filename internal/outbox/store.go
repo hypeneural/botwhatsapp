@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/hypeneural/botwhatsapp/internal/instances"
 )
 
 var (
@@ -126,6 +128,39 @@ func (s *Store) CheckAndRecordEvent(instanceID, eventType, messageID string) (bo
 
 	info := fmt.Sprintf("instance=%s\nevent=%s\nmessage=%s\ntime=%s\n",
 		instanceID, eventType, messageID, time.Now().UTC().Format(time.RFC3339Nano))
+	if _, err := io.WriteString(f, info); err != nil {
+		return false, err
+	}
+	if err := f.Sync(); err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+// ClaimLeadShared claims a lead across all instances of a tenant for a national phone and campaign,
+// using an explicit timezone location (e.g. America/Sao_Paulo) for the daily window.
+func (s *Store) ClaimLeadShared(tenant, phoneNational string, campaign int, when time.Time, loc *time.Location) (bool, error) {
+	key, err := instances.LeadClaimKey(tenant, phoneNational, campaign, when, loc)
+	if err != nil {
+		return false, fmt.Errorf("outbox: invalid lead claim key: %w", err)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	targetPath := filepath.Join(s.leadsDir, key+".lock")
+	f, err := os.OpenFile(targetPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if err != nil {
+		if os.IsExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	defer f.Close()
+
+	info := fmt.Sprintf("tenant=%s\nphone=%s\ncampaign=%d\ntime=%s\n",
+		tenant, phoneNational, campaign, when.In(loc).Format(time.RFC3339Nano))
 	if _, err := io.WriteString(f, info); err != nil {
 		return false, err
 	}
@@ -359,4 +394,71 @@ func (s *Store) RecoverTasks() (pending []Task, crashedPendingReconciliation []T
 	})
 
 	return pending, crashedPendingReconciliation, nil
+}
+
+// PruneOldTasks cleans up confirmed and suppressed tasks older than maxAge.
+// If maxCount > 0 and the remaining tasks exceed maxCount, it purges the oldest
+// completed tasks to protect disk capacity. Returns the count of deleted files.
+func (s *Store) PruneOldTasks(maxAge time.Duration, maxCount int) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	entries, err := os.ReadDir(s.tasksDir)
+	if err != nil {
+		return 0, err
+	}
+
+	type fileInfo struct {
+		name        string
+		completedAt time.Time
+		state       TaskState
+	}
+
+	var completed []fileInfo
+	now := time.Now().UTC()
+	deleted := 0
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+
+		path := filepath.Join(s.tasksDir, entry.Name())
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+
+		var t Task
+		if err := json.Unmarshal(raw, &t); err != nil {
+			continue
+		}
+
+		if t.State == TaskConfirmed || t.State == TaskSuppressed {
+			if maxAge > 0 && !t.CompletedAt.IsZero() && now.Sub(t.CompletedAt) > maxAge {
+				_ = os.Remove(path)
+				deleted++
+				continue
+			}
+			completed = append(completed, fileInfo{
+				name:        entry.Name(),
+				completedAt: t.CompletedAt,
+				state:       t.State,
+			})
+		}
+	}
+
+	// Enforce maxCount capacity if configured
+	if maxCount > 0 && len(completed) > maxCount {
+		sort.Slice(completed, func(i, j int) bool {
+			return completed[i].completedAt.Before(completed[j].completedAt)
+		})
+		toDelete := len(completed) - maxCount
+		for i := 0; i < toDelete; i++ {
+			_ = os.Remove(filepath.Join(s.tasksDir, completed[i].name))
+			deleted++
+		}
+	}
+
+	return deleted, nil
 }

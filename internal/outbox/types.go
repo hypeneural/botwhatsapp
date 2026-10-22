@@ -57,6 +57,10 @@ type Config struct {
 	AdWelcomeText            string
 	AdAudioFixture           []byte
 	GreetingImageFixture     []byte
+	Tenant                   string
+	Location                 *time.Location
+	TaskRetention            time.Duration
+	MaxTasksCount            int
 }
 
 type EvolutionSender interface {

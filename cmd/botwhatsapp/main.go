@@ -13,6 +13,7 @@ import (
 	"github.com/hypeneural/botwhatsapp/internal/crm"
 	"github.com/hypeneural/botwhatsapp/internal/evolution"
 	"github.com/hypeneural/botwhatsapp/internal/ingress"
+	"github.com/hypeneural/botwhatsapp/internal/instances"
 	"github.com/hypeneural/botwhatsapp/internal/outbox"
 )
 
@@ -38,9 +39,50 @@ func main() {
 		}
 	}
 
+	adsUUID := os.Getenv("BOT_ADS_INSTANCE_UUID")
+	greetingUUID := os.Getenv("BOT_GREETING_INSTANCE_UUID")
+	adsSecret := os.Getenv("BOT_ADS_WEBHOOK_SECRET")
+	greetingSecret := os.Getenv("BOT_GREETING_WEBHOOK_SECRET")
+
+	// Multi-instance Registry configuration
+	var reg *instances.Registry
+	secretsMap := make(map[string]string)
+	if adsUUID != "" && greetingUUID != "" {
+		defs := []instances.Definition{
+			{
+				Slug:              "ads",
+				InstanceUUID:      adsUUID,
+				BusinessPhoneE164: env("BOT_ADS_PHONE", "554832200440"),
+				Role:              instances.Ads,
+				Enabled:           true,
+				TokenEnv:          "EVOLUTION_ADS_APIKEY",
+				WebhookSecretEnv:  "BOT_ADS_WEBHOOK_SECRET",
+				AdsTriggers:       triggers,
+				CRMAllowed:        true,
+			},
+			{
+				Slug:              "greeting",
+				InstanceUUID:      greetingUUID,
+				BusinessPhoneE164: env("BOT_GREETING_PHONE", "5548996425287"),
+				Role:              instances.Greeting,
+				Enabled:           true,
+				TokenEnv:          "EVOLUTION_GREETING_APIKEY",
+				WebhookSecretEnv:  "BOT_GREETING_WEBHOOK_SECRET",
+			},
+		}
+		var err error
+		reg, err = instances.New(defs)
+		if err != nil {
+			log.Printf("warning: multi-instance registry init: %v (falling back to legacy routing)", err)
+		} else {
+			secretsMap["ads"] = adsSecret
+			secretsMap["greeting"] = greetingSecret
+		}
+	}
+
 	coreCfg := core.Config{
-		AdsUUID:      os.Getenv("BOT_ADS_INSTANCE_UUID"),
-		GreetingUUID: os.Getenv("BOT_GREETING_INSTANCE_UUID"),
+		AdsUUID:      adsUUID,
+		GreetingUUID: greetingUUID,
 		AdsTriggers:  triggers,
 		AdsFallback:  os.Getenv("BOT_ADS_FALLBACK_MENU") == "true",
 	}
@@ -77,6 +119,11 @@ func main() {
 			audioFixture = b
 		}
 
+		loc, err := time.LoadLocation("America/Sao_Paulo")
+		if err != nil {
+			loc = time.FixedZone("BRT", -3*3600)
+		}
+
 		outboxCfg := outbox.Config{
 			DataDir:                  dataDir,
 			GreetingCooldown:         24 * time.Hour,
@@ -84,6 +131,10 @@ func main() {
 			OperationalAuthorization: opAuth,
 			AdAudioFixture:           audioFixture,
 			AdWelcomeText:            env("BOT_ADS_RESPONSE_TEXT", "Oii! Tudo bem? 🎄❤️ Que alegria receber seu contato! Vamos enviar a proposta de Natal 2026 por outro WhatsApp oficial do Estúdio Evidência."),
+			Tenant:                   env("BOT_TENANT", "estudio-evydencia"),
+			Location:                 loc,
+			TaskRetention:            7 * 24 * time.Hour,
+			MaxTasksCount:            10000,
 		}
 
 		worker, err = outbox.NewWorker(outboxCfg, store, evoClient, crmClient)
@@ -112,14 +163,20 @@ func main() {
 		}
 	}
 
-	h, err := ingress.New(ingress.Settings{
+	ingressSettings := ingress.Settings{
 		Enabled:        enabled,
-		AdsSecret:      os.Getenv("BOT_ADS_WEBHOOK_SECRET"),
-		GreetingSecret: os.Getenv("BOT_GREETING_WEBHOOK_SECRET"),
+		AdsSecret:      adsSecret,
+		GreetingSecret: greetingSecret,
 		SpoolDir:       dataDir,
 		Core:           coreCfg,
 		OnDecision:     onDecision,
-	})
+	}
+	if reg != nil && len(secretsMap["ads"]) >= 32 && len(secretsMap["greeting"]) >= 32 {
+		ingressSettings.Registry = reg
+		ingressSettings.Secrets = secretsMap
+	}
+
+	h, err := ingress.New(ingressSettings)
 	if err != nil {
 		log.Fatalf("configuration invalid: %v", err)
 	}
