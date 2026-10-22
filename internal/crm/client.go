@@ -53,6 +53,7 @@ func(c Client) preflight() (string,error){
  u,err:=url.Parse(c.BaseURL)
  if err!=nil || (u.Scheme!="https"&&u.Scheme!="http") || u.Host=="" ||
   u.User!=nil||u.RawQuery!=""||u.Fragment!=""||u.Path!=""||
+  (u.Scheme=="http" && u.Hostname()!="localhost" && u.Hostname()!="127.0.0.1" && u.Hostname()!="::1")||
   strings.TrimSpace(c.Authorization)=="" || c.Authorization!=strings.TrimSpace(c.Authorization){
   return "",ErrInvalidRequest
  }
@@ -60,7 +61,8 @@ func(c Client) preflight() (string,error){
 }
 func(c Client) httpClient()*http.Client{
  if c.HTTP!=nil{return c.HTTP}
- return &http.Client{Timeout:15*time.Second}
+ return &http.Client{Timeout:15*time.Second,
+  CheckRedirect:func(*http.Request,[]*http.Request)error{return http.ErrUseLastResponse}}
 }
 
 // Decode the real Laravel response. AppServiceProvider calls
