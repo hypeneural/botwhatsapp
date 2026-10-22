@@ -60,7 +60,7 @@ services:
       - evolution_internal
 networks:
   evolution_internal:
-    name: evolution_internal
+    name: evolution-go_evolution_internal
     external: true
   edge:
     name: edge
