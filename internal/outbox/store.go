@@ -229,7 +229,11 @@ func (s *Store) GetContact(phone string) (ContactState, error) {
 
 	var state ContactState
 	if err := json.Unmarshal(raw, &state); err != nil {
-		return ContactState{PhoneE164: phone}, nil
+		// A corrupt policy is NOT a new contact: fail closed to preserve opt-outs.
+		return ContactState{}, fmt.Errorf("outbox: corrupt contact state: %w", err)
+	}
+	if state.PhoneE164 != phone {
+		return ContactState{}, errors.New("outbox: contact state identity mismatch")
 	}
 	return state, nil
 }
