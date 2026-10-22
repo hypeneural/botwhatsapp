@@ -17,3 +17,6 @@ assets/private/
 reports/*.raw
 reports/*-live.*
 reports/vps-inventory.redacted.md
+*.exe
+run_*.cmd
+run_*.bat
