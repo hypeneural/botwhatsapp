@@ -1,5 +1,5 @@
-// Package instances is a pure configuration registry for multiple Evolution Go
-// instances. It performs no I/O and never connects or changes WhatsApp sessions.
+// Package instances is a pure configuration registry for Evolution Go sessions.
+// It performs no I/O and never connects or changes WhatsApp accounts.
 package instances
 
 import (
@@ -27,66 +27,8 @@ var (
  ErrInvalidClaim = errors.New("instances: invalid lead claim")
  slugRE = regexp.MustCompile(`^[a-z][a-z0-9_-]{1,39}$`)
  phoneRE = regexp.MustCompile(`^55[0-9]{10,11}$`)
- nationalRE = regexp.MustCompile(`^[0-9]{10,11}// Package instances is a pure configuration registry for multiple Evolution Go
-// instances. It performs no I/O and never connects or changes WhatsApp sessions.
-package instances
-
-import (
- "crypto/sha256"
- "crypto/subtle"
- "encoding/hex"
- "errors"
- "fmt"
- "regexp"
- "strings"
- "time"
-
- "github.com/hypeneural/botwhatsapp/internal/core"
-)
-
-type Role string
-const (
- Ads Role = "ads"
- Greeting Role = "greeting"
- Observe Role = "observe"
-)
-var (
- ErrInvalid = errors.New("instances: invalid configuration")
- ErrUnknown = errors.New("instances: unknown or disabled instance")
- ErrInvalidClaim = errors.New("instances: invalid lead claim")
- slugRE = regexp.MustCompile(`^[a-z][a-z0-9_-]{1,39}$`)
- phoneRE = regexp.MustCompile(`^55[0-9]{10,11}$`)
-)
- envRE = regexp.MustCompile(`^[A-Z][A-Z0-9_]{2,79}// Package instances is a pure configuration registry for multiple Evolution Go
-// instances. It performs no I/O and never connects or changes WhatsApp sessions.
-package instances
-
-import (
- "crypto/sha256"
- "crypto/subtle"
- "encoding/hex"
- "errors"
- "fmt"
- "regexp"
- "strings"
- "time"
-
- "github.com/hypeneural/botwhatsapp/internal/core"
-)
-
-type Role string
-const (
- Ads Role = "ads"
- Greeting Role = "greeting"
- Observe Role = "observe"
-)
-var (
- ErrInvalid = errors.New("instances: invalid configuration")
- ErrUnknown = errors.New("instances: unknown or disabled instance")
- ErrInvalidClaim = errors.New("instances: invalid lead claim")
- slugRE = regexp.MustCompile(`^[a-z][a-z0-9_-]{1,39}$`)
- phoneRE = regexp.MustCompile(`^55[0-9]{10,11}$`)
-)
+ nationalRE = regexp.MustCompile(`^[0-9]{10,11}$`)
+ envRE = regexp.MustCompile(`^[A-Z][A-Z0-9_]{2,79}$`)
 )
 type Definition struct {
  Slug string
