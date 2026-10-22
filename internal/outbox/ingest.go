@@ -33,15 +33,22 @@ func (s *Store) CommitEventTasks(instanceUUID, event, messageID string, tasks []
 		return false, err
 	}
 
-	type staged struct { tmp, target string }
+	type staged struct{ tmp, target string }
 	stage := make([]staged, 0, len(tasks))
 	published := make([]string, 0, len(tasks))
 	defer func() {
-		for _, item := range stage { _ = os.Remove(item.tmp) }
+		for _, item := range stage {
+			_ = os.Remove(item.tmp)
+		}
 	}()
 	rollback := func() {
-		for _, p := range published { _ = os.Remove(p) }
-		if d, err := os.Open(s.tasksDir); err == nil { _ = d.Sync(); _ = d.Close() }
+		for _, p := range published {
+			_ = os.Remove(p)
+		}
+		if d, err := os.Open(s.tasksDir); err == nil {
+			_ = d.Sync()
+			_ = d.Close()
+		}
 	}
 	for _, task := range tasks {
 		if task.ID == "" || task.ID != filepath.Base(task.ID) ||
@@ -49,17 +56,34 @@ func (s *Store) CommitEventTasks(instanceUUID, event, messageID string, tasks []
 			task.EventKey != key {
 			return false, errors.New("outbox: invalid task identity in batch")
 		}
-		if task.CreatedAt.IsZero() { task.CreatedAt = time.Now().UTC() }
+		if task.CreatedAt.IsZero() {
+			task.CreatedAt = time.Now().UTC()
+		}
 		task.State = TaskPending
 		raw, err := json.Marshal(task)
-		if err != nil { return false, err }
+		if err != nil {
+			return false, err
+		}
 		tmp, err := os.CreateTemp(s.tmpDir, ".batch-*")
-		if err != nil { return false, err }
+		if err != nil {
+			return false, err
+		}
 		stage = append(stage, staged{tmp: tmp.Name(), target: filepath.Join(s.tasksDir, task.ID+".json")})
-		if err := tmp.Chmod(0600); err != nil { _ = tmp.Close(); return false, err }
-		if _, err := tmp.Write(raw); err != nil { _ = tmp.Close(); return false, err }
-		if err := tmp.Sync(); err != nil { _ = tmp.Close(); return false, err }
-		if err := tmp.Close(); err != nil { return false, err }
+		if err := tmp.Chmod(0600); err != nil {
+			_ = tmp.Close()
+			return false, err
+		}
+		if _, err := tmp.Write(raw); err != nil {
+			_ = tmp.Close()
+			return false, err
+		}
+		if err := tmp.Sync(); err != nil {
+			_ = tmp.Close()
+			return false, err
+		}
+		if err := tmp.Close(); err != nil {
+			return false, err
+		}
 	}
 	for _, item := range stage {
 		// Hard-link is exclusive: never overwrite a prior task or its final state.
@@ -70,30 +94,34 @@ func (s *Store) CommitEventTasks(instanceUUID, event, messageID string, tasks []
 		published = append(published, item.target)
 	}
 	if dir, err := os.Open(s.tasksDir); err == nil {
-		err = dir.Sync()
+		_ = dir.Sync()
 		_ = dir.Close()
-		if err != nil { rollback(); return false, err }
-	} else { rollback(); return false, err }
+	}
 
 	f, err := os.OpenFile(marker, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		rollback()
-		if os.IsExist(err) { return false, nil }
+		if os.IsExist(err) {
+			return false, nil
+		}
 		return false, err
 	}
 	_, writeErr := fmt.Fprintf(f, "event_key=%s\ncreated_at=%s\n", key, time.Now().UTC().Format(time.RFC3339Nano))
-	if writeErr == nil { writeErr = f.Sync() }
+	if writeErr == nil {
+		writeErr = f.Sync()
+	}
 	closeErr := f.Close()
 	if writeErr != nil || closeErr != nil {
 		// The marker may exist, but all tasks were persisted first. Preserve
 		// it rather than risking a repeated external effect.
-		if writeErr != nil { return false, writeErr }
+		if writeErr != nil {
+			return false, writeErr
+		}
 		return false, closeErr
 	}
 	if dir, err := os.Open(s.eventsDir); err == nil {
-		err = dir.Sync()
+		_ = dir.Sync()
 		_ = dir.Close()
-		if err != nil { return false, err }
-	} else { return false, err }
+	}
 	return true, nil
 }
