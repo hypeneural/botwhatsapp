@@ -17,3 +17,21 @@ assets/private/
 reports/*.raw
 reports/*-live.*
 reports/vps-inventory.redacted.md
+
+# Canary/local work — never commit runtime state, recordings, secrets or test launches
+*.exe
+*.test
+*.out
+run_canary.cmd
+run_canary.ps1
+testdata/*.ogg
+testdata/*.opus
+testdata/*.mp3
+testdata/*.wav
+testdata/*.webp
+testdata/*.jpg
+testdata/*.jpeg
+testdata/*.png
+**/transcript.jsonl
+**/secrets.json
+**/credentials.json
