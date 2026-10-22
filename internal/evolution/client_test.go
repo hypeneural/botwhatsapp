@@ -16,7 +16,7 @@ func TestTextMediaAndUncertain(t *testing.T) {
 		if r.Header.Get("apikey") != "test-token" {
 			t.Error("missing auth")
 		}
-		if r.URL.Path != "/send/text" && r.URL.Path != "/send/media" {
+		if r.URL.Path != "/send/text" && r.URL.Path != "/send/media" && r.URL.Path != "/message/react" {
 			t.Error(r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -34,7 +34,13 @@ func TestTextMediaAndUncertain(t *testing.T) {
 	if id, err := c.SendDocument(context.Background(), "5548996425287", []byte("%PDF-1.7 dummy"), "Proposta_Natal.pdf"); err != nil || id != "wa-message-123" {
 		t.Fatal(id, err)
 	}
-	if calls != 3 {
+	if id, err := c.SendDocumentURL(context.Background(), "5548996425287", "http://bot:8788/static/Proposta_Natal.pdf", "Proposta_Natal.pdf", "Proposta Natal 2026"); err != nil || id != "wa-message-123" {
+		t.Fatal(id, err)
+	}
+	if id, err := c.SendReaction(context.Background(), "5548996425287", "msg-target-1", "🎄"); err != nil || id != "wa-message-123" {
+		t.Fatal(id, err)
+	}
+	if calls != 5 {
 		t.Fatal(calls)
 	}
 	bad := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

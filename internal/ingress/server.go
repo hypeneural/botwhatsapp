@@ -25,6 +25,7 @@ type Settings struct {
 	GreetingSecret string
 	Core           core.Config
 	SpoolDir       string
+	StaticDir      string
 	OnDecision     func(core.Decision) error
 	Registry       *instances.Registry
 	Secrets        map[string]string // Slug -> Secret
@@ -73,6 +74,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(200)
 		_, _ = io.WriteString(w, "ready")
+		return
+	}
+	if strings.HasPrefix(r.URL.Path, "/static/") && r.Method == http.MethodGet && s.settings.StaticDir != "" {
+		http.StripPrefix("/static/", http.FileServer(http.Dir(s.settings.StaticDir))).ServeHTTP(w, r)
 		return
 	}
 	// NO request logging: URL contains a secret.

@@ -35,6 +35,9 @@ func NewWorker(cfg Config, store *Store, evolution EvolutionSender, crmScheduler
 	if cfg.AdsFlowCooldown <= 0 {
 		cfg.AdsFlowCooldown = 24 * time.Hour
 	}
+	if cfg.AdDocumentCaption == "" {
+		cfg.AdDocumentCaption = "Proposta de Natal 2026 - Estúdio Evydência"
+	}
 	if cfg.AdWelcomeText == "" {
 		cfg.AdWelcomeText = "Oii! Tudo bem? 🎄❤️ Que alegria receber seu contato! Vamos enviar a proposta de Natal 2026 por outro WhatsApp oficial do Estúdio Evidência."
 	}
@@ -130,7 +133,8 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 	}
 	// 5. Create workflow plan and enqueue tasks
 	plan := workflow.CreateWithOptions(d, workflow.Options{
-		AdDocument:    len(w.cfg.AdDocumentFixture) > 0,
+		AdReaction:    w.cfg.AdReactionEmoji != "",
+		AdDocument:    len(w.cfg.AdDocumentFixture) > 0 || strings.TrimSpace(w.cfg.AdDocumentURL) != "",
 		AdClosingText: strings.TrimSpace(w.cfg.AdClosingText) != "",
 		AdImage:       len(w.cfg.AdImageFixture) > 0,
 		AdVideo:       len(w.cfg.AdVideoFixture) > 0,
@@ -154,6 +158,7 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 			EventKey:          eventKey,
 			InstanceID:        d.InstanceID,
 			RecipientJID:      d.ReplyJID,
+			InboundMessageID:  d.MessageID,
 			PhoneE164:         d.PhoneE164,
 			CRMPhone:          d.CRMPhone,
 			ContactName:       d.Name,
@@ -164,8 +169,12 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 		}
 
 		switch step {
+		case workflow.SendAdReaction:
+			task.PayloadText = w.cfg.AdReactionEmoji
 		case workflow.SendAdText:
 			task.PayloadText = personalize(w.cfg.AdWelcomeText, d.Name)
+		case workflow.SendAdDocument:
+			task.PayloadCaption = w.cfg.AdDocumentCaption
 		case workflow.SendAdClosingText:
 			task.PayloadText = personalize(w.cfg.AdClosingText, d.Name)
 		case workflow.SendAdImage:
@@ -256,7 +265,7 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 		return w.recordSuppressed(task.ID, "greeting cooldown not elapsed at send time")
 	}
 	// Do not transmit fake/missing media; suppress BEFORE attempt_started.
-	if task.Step == workflow.SendAdDocument && len(w.cfg.AdDocumentFixture) == 0 {
+	if task.Step == workflow.SendAdDocument && len(w.cfg.AdDocumentFixture) == 0 && strings.TrimSpace(w.cfg.AdDocumentURL) == "" {
 		return w.recordSuppressed(task.ID, "ad document unavailable: no outbound request attempted")
 	}
 	if task.Step == workflow.SendAdAudio && len(w.cfg.AdAudioFixture) == 0 {
@@ -310,6 +319,26 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 	}
 	// Execute specific step effect
 	switch task.Step {
+	case workflow.SendAdReaction:
+		if sender == nil {
+			return w.recordUncertain(task.ID, "evolution sender not configured")
+		}
+		if task.InboundMessageID == "" {
+			return w.recordSuppressed(task.ID, "inbound message id missing for reaction")
+		}
+		emoji := strings.TrimSpace(task.PayloadText)
+		if emoji == "" {
+			emoji = strings.TrimSpace(w.cfg.AdReactionEmoji)
+		}
+		if emoji == "" {
+			emoji = "🎄"
+		}
+		id, err := sender.SendReaction(ctx, task.RecipientJID, task.InboundMessageID, emoji)
+		if err != nil {
+			return w.recordUncertain(task.ID, err.Error())
+		}
+		return w.recordConfirmed(task.ID, id)
+
 	case workflow.SendAdText:
 		if sender == nil {
 			return w.recordUncertain(task.ID, "evolution sender not configured")
@@ -358,10 +387,21 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 		if filename == "" {
 			filename = "Proposta_Natal.pdf"
 		}
-		id, err := sender.SendDocument(ctx, task.RecipientJID, w.cfg.AdDocumentFixture, filename)
+		caption := strings.TrimSpace(task.PayloadCaption)
+		if caption == "" {
+			caption = strings.TrimSpace(w.cfg.AdDocumentCaption)
+		}
+		var id string
+		var err error
+		if strings.TrimSpace(w.cfg.AdDocumentURL) != "" {
+			id, err = sender.SendDocumentURL(ctx, task.RecipientJID, w.cfg.AdDocumentURL, filename, caption)
+		} else {
+			id, err = sender.SendDocument(ctx, task.RecipientJID, w.cfg.AdDocumentFixture, filename)
+		}
 		if err != nil {
 			return w.recordUncertain(task.ID, err.Error())
 		}
+		time.Sleep(1500 * time.Millisecond)
 		return w.recordConfirmed(task.ID, id)
 
 	case workflow.SendAdClosingText:

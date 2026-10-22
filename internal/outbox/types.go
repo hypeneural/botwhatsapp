@@ -24,6 +24,7 @@ type Task struct {
 	LeadKey           string        `json:"lead_key,omitempty"`
 	InstanceID        string        `json:"instance_id"`
 	RecipientJID      string        `json:"recipient_jid"`
+	InboundMessageID  string        `json:"inbound_message_id,omitempty"`
 	PhoneE164         string        `json:"phone_e164"`
 	CRMPhone          string        `json:"crm_phone,omitempty"`
 	ContactName       string        `json:"contact_name,omitempty"`
@@ -58,10 +59,13 @@ type Config struct {
 	CRMInstanceID            *int
 	OperationalAuthorization bool
 	GreetingCaption          string
+	AdReactionEmoji          string
 	AdWelcomeText            string
 	AdAudioFixture           []byte
 	AdDocumentFixture        []byte
 	AdDocumentFilename       string
+	AdDocumentURL            string
+	AdDocumentCaption        string
 	AdClosingText            string
 	AdImageFixture           []byte
 	AdVideoFixture           []byte
@@ -80,6 +84,8 @@ type EvolutionSender interface {
 	SendText(ctx context.Context, phone, text string) (string, error)
 	SendMedia(ctx context.Context, phone, mediaType string, file []byte, caption string) (string, error)
 	SendDocument(ctx context.Context, phone string, file []byte, filename string) (string, error)
+	SendDocumentURL(ctx context.Context, phone, documentURL, filename, caption string) (string, error)
+	SendReaction(ctx context.Context, phone, messageID, reaction string) (string, error)
 }
 
 type CRMScheduler interface {

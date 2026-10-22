@@ -198,9 +198,12 @@ func main() {
 			DataDir: dataDir, GreetingCooldown: 24 * time.Hour, AdsFlowCooldown: time.Duration(adsCooldownHours) * time.Hour,
 			CRMInstanceID:            crmInstanceID,
 			OperationalAuthorization: opAuth,
+			AdReactionEmoji:          env("BOT_ADS_REACTION_EMOJI", "🎄"),
 			AdAudioFixture:           audio,
 			AdDocumentFixture:        adDoc,
 			AdDocumentFilename:       env("BOT_ADS_DOCUMENT_FILENAME", "Proposta_Natal.pdf"),
+			AdDocumentURL:            env("BOT_ADS_DOCUMENT_URL", "http://bot:8788/static/Proposta_Natal.pdf"),
+			AdDocumentCaption:        env("BOT_ADS_DOCUMENT_CAPTION", "Proposta de Natal 2026 - Estúdio Evydência"),
 			GreetingImageFixture:     image,
 			AdImageFixture:           adImage,
 			AdVideoFixture:           adVideo,
@@ -263,6 +266,7 @@ func main() {
 		GreetingSecret: secrets["greeting"],
 		SpoolDir:       dataDir, Core: coreCfg, OnDecision: onDecision,
 		Registry: reg, Secrets: secrets,
+		StaticDir: env("BOT_ASSETS_DIR", "./assets"),
 	})
 	if err != nil {
 		log.Fatalf("invalid webhook configuration: %v", err)

@@ -20,11 +20,13 @@ type mockEvolutionSender struct {
 	mu         sync.Mutex
 	textCalls  int
 	mediaCalls int
+	reactCalls int
 	failAudio  bool
 	textErr    error
 	mediaErr   error
 	sentTexts  []string
 	sentMedia  []string
+	sentReacts []string
 }
 
 func (m *mockEvolutionSender) SendText(ctx context.Context, phone, text string) (string, error) {
@@ -61,6 +63,28 @@ func (m *mockEvolutionSender) SendDocument(ctx context.Context, phone string, fi
 	}
 	m.sentMedia = append(m.sentMedia, "document:"+filename)
 	return fmt.Sprintf("evo-doc-%d", m.mediaCalls), nil
+}
+
+func (m *mockEvolutionSender) SendDocumentURL(ctx context.Context, phone, documentURL, filename, caption string) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.mediaCalls++
+	if m.mediaErr != nil {
+		return "", m.mediaErr
+	}
+	m.sentMedia = append(m.sentMedia, "document_url:"+filename)
+	return fmt.Sprintf("evo-docurl-%d", m.mediaCalls), nil
+}
+
+func (m *mockEvolutionSender) SendReaction(ctx context.Context, phone, messageID, reaction string) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.reactCalls++
+	if m.mediaErr != nil {
+		return "", m.mediaErr
+	}
+	m.sentReacts = append(m.sentReacts, reaction)
+	return fmt.Sprintf("evo-react-%d", m.reactCalls), nil
 }
 
 type mockCRMScheduler struct {

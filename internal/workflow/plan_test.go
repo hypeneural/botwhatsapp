@@ -7,6 +7,8 @@ import (
 func TestPlans(t *testing.T){
  ad:=Create(core.Decision{Action:core.AdsProposal})
  if len(ad.Steps)!=3||ad.Steps[2]!=ScheduleNatal{t.Fatal(ad)}
+ adFull:=CreateWithOptions(core.Decision{Action:core.AdsProposal},Options{AdReaction:true,AdDocument:true,AdClosingText:true})
+ if len(adFull.Steps)!=6||adFull.Steps[0]!=SendAdReaction||adFull.Steps[3]!=SendAdDocument||adFull.Steps[5]!=ScheduleNatal{t.Fatal(adFull)}
  gr:=Create(core.Decision{Action:core.Greeting})
  if len(gr.Steps)!=1||gr.Steps[0]!=SendGreetingImage{t.Fatal(gr)}
  h:=Create(core.Decision{Action:core.MenuOption,Option:"5"})

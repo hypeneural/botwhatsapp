@@ -12,6 +12,7 @@ import (
 type Step string
 
 const (
+	SendAdReaction    Step = "send_ad_reaction"
 	SendAdText        Step = "send_ad_text"
 	SendAdAudio       Step = "send_ad_audio"
 	SendAdDocument    Step = "send_ad_document"
@@ -33,6 +34,7 @@ type Plan struct {
 // Options controls optional visual stages. A missing image/video is NOT a
 // dummy asset or a missing CRM prerequisite.
 type Options struct {
+	AdReaction    bool
 	AdDocument    bool
 	AdClosingText bool
 	AdImage       bool
@@ -47,7 +49,11 @@ func Create(d core.Decision) Plan {
 func CreateWithOptions(d core.Decision, o Options) Plan {
 	switch d.Action {
 	case core.AdsProposal:
-		steps := []Step{SendAdText, SendAdAudio}
+		steps := make([]Step, 0, 8)
+		if o.AdReaction {
+			steps = append(steps, SendAdReaction)
+		}
+		steps = append(steps, SendAdText, SendAdAudio)
 		if o.AdDocument {
 			steps = append(steps, SendAdDocument)
 		}

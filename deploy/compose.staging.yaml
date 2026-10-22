@@ -27,9 +27,11 @@ services:
       BOT_OUTBOUND_ENABLED: "false"
       BOT_OPERATIONAL_AUTHORIZATION: "false"
       BOT_DATA_DIR: "/var/lib/botwhatsapp/spool"
+      BOT_ASSETS_DIR: "/app/assets"
     volumes:
       - botwhatsapp_data:/var/lib/botwhatsapp/spool
       - ../config:/app/config:ro
+      - ../assets:/app/assets:ro
     networks:
       - evolution_internal
       - edge

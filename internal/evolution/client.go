@@ -85,6 +85,7 @@ func (c Client) send(ctx context.Context, path string, payload any) (string, err
 		Data struct {
 			Info struct {
 				ID string `json:"ID"`
+				Id string `json:"id"`
 			} `json:"Info"`
 			Key struct {
 				ID string `json:"id"`
@@ -97,6 +98,9 @@ func (c Client) send(ctx context.Context, path string, payload any) (string, err
 		return "", ErrUnconfirmed
 	}
 	msgID := response.Data.Info.ID
+	if msgID == "" {
+		msgID = response.Data.Info.Id
+	}
 	if msgID == "" {
 		msgID = response.Data.Key.ID
 	}
@@ -153,6 +157,10 @@ func (c Client) SendDocument(ctx context.Context, phone string, file []byte, fil
 }
 
 func (c Client) SendDocumentWithID(ctx context.Context, phone string, file []byte, filename, id string) (string, error) {
+	return c.SendDocumentWithCaptionAndID(ctx, phone, file, filename, "", id)
+}
+
+func (c Client) SendDocumentWithCaptionAndID(ctx context.Context, phone string, file []byte, filename, caption, id string) (string, error) {
 	if phone == "" || len(file) == 0 || len(file) > 25<<20 {
 		return "", ErrInvalid
 	}
@@ -165,10 +173,56 @@ func (c Client) SendDocumentWithID(ctx context.Context, phone string, file []byt
 		"url":      base64.StdEncoding.EncodeToString(file),
 		"filename": filename,
 	}
+	if strings.TrimSpace(caption) != "" {
+		p["caption"] = caption
+	}
 	if id != "" {
 		p["id"] = id
 	}
 	return c.send(ctx, "/send/media", p)
+}
+
+func (c Client) SendDocumentURL(ctx context.Context, phone, documentURL, filename, caption string) (string, error) {
+	return c.SendDocumentURLWithID(ctx, phone, documentURL, filename, caption, "")
+}
+
+func (c Client) SendDocumentURLWithID(ctx context.Context, phone, documentURL, filename, caption, id string) (string, error) {
+	if phone == "" || strings.TrimSpace(documentURL) == "" {
+		return "", ErrInvalid
+	}
+	if filename == "" {
+		filename = "document.pdf"
+	}
+	p := map[string]string{
+		"number":   phone,
+		"type":     "document",
+		"url":      strings.TrimSpace(documentURL),
+		"filename": filename,
+	}
+	if strings.TrimSpace(caption) != "" {
+		p["caption"] = caption
+	}
+	if id != "" {
+		p["id"] = id
+	}
+	return c.send(ctx, "/send/media", p)
+}
+
+func (c Client) SendReaction(ctx context.Context, phone, messageID, reaction string) (string, error) {
+	return c.SendReactionWithID(ctx, phone, messageID, reaction, "")
+}
+
+func (c Client) SendReactionWithID(ctx context.Context, phone, messageID, reaction, id string) (string, error) {
+	if phone == "" || messageID == "" || strings.TrimSpace(reaction) == "" {
+		return "", ErrInvalid
+	}
+	p := map[string]any{
+		"number":   phone,
+		"id":       messageID,
+		"reaction": strings.TrimSpace(reaction),
+		"fromMe":   false,
+	}
+	return c.send(ctx, "/message/react", p)
 }
 
 // Status uses the existing read-only Evolution Go endpoint. The status is a

@@ -195,3 +195,84 @@ func TestAdSequenceWithDocumentAndClosingText(t *testing.T) {
 		t.Fatalf("unexpected CRM request: %+v", crmSched.lastReq)
 	}
 }
+
+func TestAdReactionAndDocumentURLFlow(t *testing.T) {
+	store, _ := setupTestStore(t)
+	evo := &mockEvolutionSender{}
+	crmSched := &mockCRMScheduler{}
+	instance := 1
+
+	w, err := NewWorker(Config{
+		CRMInstanceID:            &instance,
+		OperationalAuthorization: true,
+		AdReactionEmoji:          "🎄",
+		AdWelcomeText:            "Oi! Bem-vindo.",
+		AdAudioFixture:           []byte("synthetic OGG"),
+		AdDocumentURL:            "http://bot:8788/static/Proposta_Natal.pdf",
+		AdDocumentFilename:       "Proposta_Natal.pdf",
+		AdDocumentCaption:        "Proposta de Natal 2026 - Estúdio Evydência",
+		AdClosingText:            "Qualquer dúvida pode falar.",
+	}, store, evo, crmSched)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	d := core.Decision{
+		Action:     core.AdsProposal,
+		InstanceID: "ads-uuid",
+		MessageID:  "msg-natal-trigger-1",
+		PhoneE164:  "5548999991234",
+		CRMPhone:   "48999991234",
+		ReplyJID:   "5548999991234@s.whatsapp.net",
+		Name:       "Tati",
+	}
+
+	if err := w.IngestDecision(d); err != nil {
+		t.Fatal(err)
+	}
+
+	pending, _, err := store.RecoverTasks()
+	if err != nil || len(pending) != 6 {
+		t.Fatalf("expected 6 tasks (reaction, text, audio, doc_url, closing, crm), got %d %v", len(pending), err)
+	}
+	want := []workflow.Step{
+		workflow.SendAdReaction,
+		workflow.SendAdText,
+		workflow.SendAdAudio,
+		workflow.SendAdDocument,
+		workflow.SendAdClosingText,
+		workflow.ScheduleNatal,
+	}
+	for i, p := range pending {
+		if p.Step != want[i] {
+			t.Fatalf("step %d got %s, want %s", i, p.Step, want[i])
+		}
+		if p.InboundMessageID != "msg-natal-trigger-1" {
+			t.Fatalf("step %d missing InboundMessageID: got %s", i, p.InboundMessageID)
+		}
+	}
+
+	ctx := context.Background()
+	if _, err := w.DrainPending(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if evo.reactCalls != 1 {
+		t.Fatalf("expected 1 reaction call, got %d", evo.reactCalls)
+	}
+	if len(evo.sentReacts) == 0 || evo.sentReacts[0] != "🎄" {
+		t.Fatalf("expected reaction 🎄, got %v", evo.sentReacts)
+	}
+	if evo.textCalls != 2 {
+		t.Fatalf("expected 2 sent texts, got %d", evo.textCalls)
+	}
+	if evo.mediaCalls != 2 {
+		t.Fatalf("expected 2 sent media (audio, doc_url), got %d", evo.mediaCalls)
+	}
+	if evo.sentMedia[1] != "document_url:Proposta_Natal.pdf" {
+		t.Fatalf("expected doc url sent, got %v", evo.sentMedia)
+	}
+	if crmSched.calls != 1 {
+		t.Fatalf("expected 1 CRM call, got %d", crmSched.calls)
+	}
+}
