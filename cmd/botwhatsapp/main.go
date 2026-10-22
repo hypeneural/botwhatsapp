@@ -62,7 +62,10 @@ func main() {
 	defs := make([]instances.Definition, 0, 2)
 	secrets := make(map[string]string)
 	senders := make(map[string]outbox.EvolutionSender)
-	evoBaseURL := env("EVOLUTION_GO_BASE_URL", "https://wa-api.etijucas.com.br")
+	evoBaseURL := strings.TrimSpace(os.Getenv("EVOLUTION_GO_BASE_URL"))
+	if outboundEnabled && evoBaseURL == "" {
+		log.Fatal("EVOLUTION_GO_BASE_URL must be explicitly configured for outbound")
+	}
 	if adsUUID != "" {
 		defs = append(defs, instances.Definition{
 			Slug: "ads", InstanceUUID: adsUUID,
@@ -134,6 +137,9 @@ func main() {
 		loc, err := time.LoadLocation("America/Sao_Paulo")
 		if err != nil {
 			log.Fatal("America/Sao_Paulo timezone is required for shared CRM claim")
+		}
+		if adsUUID != "" && strings.TrimSpace(os.Getenv("EVIDENCIA_CRM_AUTHORIZATION")) == "" {
+			log.Fatal("ads campaign requires EVIDENCIA_CRM_AUTHORIZATION")
 		}
 		crmClient := crm.Client{
 			BaseURL: env("EVIDENCIA_CRM_BASE_URL", "https://evydencia.com"),
