@@ -24,6 +24,7 @@ type Settings struct {
  GreetingSecret string
  Core core.Config
  SpoolDir string
+ OnDecision func(core.Decision)
 }
 type Server struct {settings Settings}
 func New(c Settings) (*Server,error){
@@ -85,5 +86,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter,r *http.Request) {
  if err!=nil {http.Error(w,"spool unavailable",503);return}
  // Delivery of inbound webhook is accepted only after a durable record exists.
  if d,err:=os.Open(s.settings.SpoolDir);err==nil {_=d.Sync();_=d.Close()}
+ if s.settings.OnDecision!=nil {go s.settings.OnDecision(decision)}
  w.WriteHeader(202)
 }
