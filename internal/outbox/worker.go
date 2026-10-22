@@ -150,6 +150,10 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 	isNew, err := w.store.CommitEventTasks(d.InstanceID, "Message", d.MessageID, tasks)
 	if err != nil { return fmt.Errorf("outbox: cannot commit event tasks: %w", err) }
 	if !isNew { return ErrEventDuplicate }
+	// Prompt processing immediately; a full queue never drops the durable task.
+	for _, task := range tasks {
+		select { case w.taskCh <- task: default: }
+	}
 	return nil
 }
 
@@ -364,4 +368,15 @@ func (w *Worker) DrainPending(ctx context.Context) (int, error) {
 	}
 
 	return count, nil
+}
+
+
+// PendingTasks is only an optimization. Durable storage and periodic recovery
+// remain authoritative if the bounded queue is full or the process restarts.
+func (w *Worker) PendingTasks() <-chan Task { return w.taskCh }
+
+// PruneCompleted is explicit and never removes pending or uncertain tasks.
+// Invoke on a low-frequency maintenance schedule, not on every webhook.
+func (w *Worker) PruneCompleted() (int,error) {
+	return w.store.PruneOldTasks(w.cfg.TaskRetention,w.cfg.MaxTasksCount)
 }
