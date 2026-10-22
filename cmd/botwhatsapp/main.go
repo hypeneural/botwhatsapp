@@ -261,12 +261,19 @@ func main() {
 	}
 	// Preview mode never enqueues production tasks. In outbound mode it must
 	// synchronously persist tasks BEFORE the webhook returns HTTP 202.
+	maxBodyBytes := int64(32 << 20)
+	if s := os.Getenv("BOT_MAX_BODY_BYTES"); s != "" {
+		if v, err := strconv.ParseInt(s, 10, 64); err == nil && v >= 1<<20 && v <= 100<<20 {
+			maxBodyBytes = v
+		}
+	}
 	h, err := ingress.New(ingress.Settings{
 		Enabled: enabled, AdsSecret: secrets["ads"],
 		GreetingSecret: secrets["greeting"],
 		SpoolDir:       dataDir, Core: coreCfg, OnDecision: onDecision,
 		Registry: reg, Secrets: secrets,
-		StaticDir: env("BOT_ASSETS_DIR", "./assets"),
+		StaticDir:    env("BOT_ASSETS_DIR", "./assets"),
+		MaxBodyBytes: maxBodyBytes,
 	})
 	if err != nil {
 		log.Fatalf("invalid webhook configuration: %v", err)

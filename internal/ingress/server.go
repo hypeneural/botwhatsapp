@@ -29,6 +29,7 @@ type Settings struct {
 	OnDecision     func(core.Decision) error
 	Registry       *instances.Registry
 	Secrets        map[string]string // Slug -> Secret
+	MaxBodyBytes   int64
 }
 
 type Server struct {
@@ -172,7 +173,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	limit := s.settings.MaxBodyBytes
+	if limit <= 0 {
+		limit = 32 << 20
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "payload too large or unreadable", 413)
