@@ -23,14 +23,14 @@ Sem mudança em nenhuma porta, image, Compose ou rede atual da Evolution Go/stat
 - `cmd/webhook-relay`: processo independente `RELAY_ENABLED=false` por padrão.
 - `internal/relay`: grava JSON integral do evento (modo 0600; volume privado) e fsync antes de ACK 202. Verifica UUID da instância e segredo independente na rota; encaminha **status primeiro** e **bot depois**, persistindo ACK de cada um separadamente. Se status falhar, o bot aguarda.
 - Retry interno com backoff conservador 15s; upstream Evolution Go 0.7.2 pode tentar mais 5 vezes. Repetições idênticas são deduplicadas por UUID/evento/messageID ou hash da entrada.
-- Ao concluir ambos os envios, remove o payload do registro, deixando tombstone por 7 dias; eventos pendentes NÃO são apagados automaticamente. Limite `RELAY_MAX_EVENTS` recusa 503 quando cheio, em vez de descartar silenciosamente.
+- Ao concluir ambos os envios, remove o payload do registro, deixando tombstone por 7 dias; eventos pendentes NÃO são apagados automaticamente. Limites `RELAY_MAX_EVENTS` e `RELAY_MAX_SPOOL_BYTES` (padrão 128MiB) recusam 503 quando cheios, sem descartar eventos pendentes. A capacidade é contabilizada novamente após reinício.
 - O status ENGINE precisa ser idempotente: queda entre recebimento 2xx e persistência do ACK do relay pode ocasionar reenquadramento ao status-engine. **Exatamente uma entrega física NÃO é garantida**.
 
 ## Bloqueadores obrigatórios antes de mudar o webhook
 1. Auditar código/contratos reais do `whatsapp-status-status-engine-1`, especialmente schema de entrada, HMAC/autorização, ACK, retries e deduplicação. Se o motor não tolera replay, não fazer cutover.
 2. Confirmar nomes de Docker networks (`evolution_internal`, `edge`), resolução DNS e link do status-engine por `docker network inspect` / leituras sem mutação. O status atual utiliza :8050; não mudar.
 3. Verificar que o sidecar recebe e persiste em mídia durável e que os dois destinos são acessíveis por rede privada. Exigir `no-new-privileges`, usuário não-root e volume protegido.
-4. Validar limites de tamanho dos webhooks reais da instância (pode conter mensagens com mídia). O default 256 KiB poderá rejeitar payloads grandes; antes de produção observar tamanhos sem inspecionar conteúdo privado. Ajustar limite antes do cutover, com quota de disco.
+4. Validar limites de tamanho dos webhooks reais da instância (podem conter mensagens com mídia). O default 256 KiB pode rejeitar payloads grandes; antes de produção observar tamanhos sem inspecionar conteúdo privado. Existe quota de bytes (128MiB por padrão), mas é preciso calibrar e criar alarmes de backlog/disco antes do cutover.
 5. Confirmar versão exata/patch do binário GO instalado e se a mesma instância mantém apenas um webhook por instância. Não alterar `WEBHOOK_URL` global.
 6. Para operar bot Ads: frase Meta exata confirmada, UUID da instância, token por instância, asset OGG Opus aprovado, token interno CRM e instância CRM numérica 1 confirmada em leitura; **nunca** repetir canário de campanha 416 que já foi agendada para o contato teste.
 7. Para saudação: número `48 99642-5287` pareado como NOVA instância GO separada, imagem/caption reais, consentimento/mensagens de entrada, opt-out durável; não misturar com a saída CRM.
@@ -45,7 +45,7 @@ Sem mudança em nenhuma porta, image, Compose ou rede atual da Evolution Go/stat
 
 ## Limitações ainda abertas
 - Persistência de eventos do relay guarda temporariamente o payload original com `instanceToken` e PII. Em volume privado 0600, sem logs, com scrub na conclusão. Implementar proteção de disco/criptografia e observabilidade operacional conforme política de privacidade antes da operação permanente.
-- Capacity por número de arquivos, não volume total de bytes. Até validar tamanho de payload e crescimento, **produção contínua não liberada**.
+- Capacity por número de arquivos E total de bytes já foi implementada. Porém faltam métricas/alertas operacionais e dados de volume real; atingir a capacidade devolve 503 e a GO só tenta entregar um número limitado de vezes. **Produção contínua não liberada sem observabilidade e preflight**.
 - Exibição do status `api_accepted` não significa entregue/lido; CRM `scheduled` não garante proposta entregue.
 - Um processo por volume: não há trava distribuída. Rollout com `replicas:1`, sem autoscaling.
 - Não presumir que a evolução Go embuta assinatura HMAC; o caminho secreto só protege dentro da rede privada. Nunca publicar webhook publicamente.
