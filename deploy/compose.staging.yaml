@@ -1,0 +1,64 @@
+# SAFETY: staging blueprint ONLY. Does not modify any existing Compose stack.
+# Run 'docker compose -f deploy/compose.staging.yaml config' locally first.
+# NO 'ports:' mappings. Production roll-out is separately authorized.
+name: botwhatsapp-stage
+services:
+  bot:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: "no"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    env_file:
+      - path: ../.env.production
+        required: false
+    environment:
+      BOT_LISTEN_ADDR: "0.0.0.0:8788"
+      BOT_ENABLED: "false"
+      BOT_OUTBOUND_ENABLED: "false"
+      BOT_OPERATIONAL_AUTHORIZATION: "false"
+      BOT_DATA_DIR: "/var/lib/botwhatsapp/spool"
+    volumes:
+      - botwhatsapp_data:/var/lib/botwhatsapp/spool
+    networks:
+      - evolution_internal
+      - edge
+  relay:
+    build:
+      context: ..
+      dockerfile: Dockerfile.relay
+    restart: "no"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    env_file:
+      - path: ../.env.production
+        required: false
+    environment:
+      RELAY_LISTEN_ADDR: "0.0.0.0:8789"
+      RELAY_ENABLED: "false"
+      RELAY_DATA_DIR: "/var/lib/botwhatsapp-relay/spool"
+    volumes:
+      - botwhatsapp_relay_data:/var/lib/botwhatsapp-relay/spool
+    networks:
+      - evolution_internal
+networks:
+  evolution_internal:
+    name: evolution_internal
+    external: true
+  edge:
+    name: edge
+    external: true
+volumes:
+  botwhatsapp_data:
+  botwhatsapp_relay_data:
