@@ -29,7 +29,13 @@ func main(){
 		if e!=nil||v<1||v>100000 {log.Fatal("invalid RELAY_MAX_EVENTS")}
 		max=v
 	}
-	store,err:=relay.NewStore(getenv("RELAY_DATA_DIR","./data/relay"),max)
+	maxBytes:=int64(128<<20)
+	if str:=os.Getenv("RELAY_MAX_SPOOL_BYTES");str!=""{
+		v,e:=strconv.ParseInt(str,10,64)
+		if e!=nil||v<4096||v>16<<30 {log.Fatal("invalid RELAY_MAX_SPOOL_BYTES")}
+		maxBytes=v
+	}
+	store,err:=relay.NewStoreWithLimits(getenv("RELAY_DATA_DIR","./data/relay"),max,maxBytes)
 	if err!=nil{log.Fatal("relay store init failed: ",err)}
 	cfg:=relay.Config{
 		Enabled:enabled,
