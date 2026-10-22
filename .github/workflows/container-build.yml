@@ -1,0 +1,22 @@
+name: Container builds and staging config (no deploy)
+on:
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - 'Dockerfile.relay'
+      - 'deploy/**'
+      - '.github/workflows/container-build.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Validate staging syntax only
+        run: docker compose -f deploy/compose.staging.yaml config --quiet
+      - name: Build bot image locally (do not push or run)
+        run: docker build --pull -f Dockerfile -t botwhatsapp:preflight .
+      - name: Build relay image locally (do not push or run)
+        run: docker build --pull -f Dockerfile.relay -t botwhatsapp-relay:preflight .
