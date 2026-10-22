@@ -21,10 +21,14 @@ instances:
     business_phone_e164: "554832200440"
     instance_uuid: null
     token_env: EVOLUTION_ADS_APIKEY
-    exact_ad_phrases: []
+    exact_ad_phrases_file: config/ads-triggers.txt # FONTE REAL no runtime
+    exact_ad_phrases: [] # histórico/editorial; não lido pelo Go
     response_text: "Oii! Tudo bem? 🎄❤️ Que alegria receber seu contato! Vamos enviar a proposta de Natal 2026 por outro WhatsApp oficial do Estúdio Evidência."
     audio_file: null
     fallback_menu_enabled: true
+    image_file: null # opcional: passo depois do áudio
+    video_file: null # opcional MP4, passo depois da imagem
+    image_caption_file: config/ads-image-caption.txt
   greeting:
     enabled: false
     business_phone_e164: "5548996425287"
