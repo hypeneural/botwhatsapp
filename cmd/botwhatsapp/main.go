@@ -51,13 +51,8 @@ func main() {
 	adsUUID := strings.TrimSpace(os.Getenv("BOT_ADS_INSTANCE_UUID"))
 	greetingUUID := strings.TrimSpace(os.Getenv("BOT_GREETING_INSTANCE_UUID"))
 
-	triggers := []string{}
-	// Never infer a Meta Ads trigger from vague phrases in source code.
-	for _, x := range strings.Split(os.Getenv("BOT_ADS_TRIGGERS"), "|") {
-		if x = strings.TrimSpace(x); x != "" {
-			triggers = append(triggers, x)
-		}
-	}
+	triggers,err:=loadAdTriggers()
+	if err!=nil {log.Fatalf("invalid ad trigger configuration: %T",err)}
 
 	defs := make([]instances.Definition, 0, 2)
 	secrets := make(map[string]string)
@@ -72,7 +67,7 @@ func main() {
 			BusinessPhoneE164: env("BOT_ADS_PHONE", "554832200440"),
 			Role: instances.Ads, Enabled: true, TokenEnv: "EVOLUTION_ADS_APIKEY",
 			WebhookSecretEnv: "BOT_ADS_WEBHOOK_SECRET",
-			AdsTriggers: triggers, CRMAllowed: true,
+			AdsTriggers: triggers, AdsFallback: env("BOT_ADS_FALLBACK_MENU","true")=="true", CRMAllowed: true,
 		})
 		secrets["ads"] = os.Getenv("BOT_ADS_WEBHOOK_SECRET")
 		if outboundEnabled {
@@ -122,7 +117,7 @@ func main() {
 	}
 	coreCfg := core.Config{
 		AdsUUID: adsUUID, GreetingUUID: greetingUUID, AdsTriggers: triggers,
-		AdsFallback: os.Getenv("BOT_ADS_FALLBACK_MENU") == "true",
+		AdsFallback: env("BOT_ADS_FALLBACK_MENU","true")=="true",
 	}
 
 	var worker *outbox.Worker
@@ -151,6 +146,8 @@ func main() {
 		}
 		audio := readAsset("BOT_ADS_AUDIO_FILE")
 		image := readAsset("BOT_GREETING_IMAGE_FILE")
+		adImage := readAsset("BOT_ADS_IMAGE_FILE")
+		adVideo := readAsset("BOT_ADS_VIDEO_FILE")
 		// Validate configured files before allowing live media. Explicitly
 		// missing files remain suppressed by the outbox; never send a fake.
 		if len(audio) > 0 && (!strings.HasPrefix(string(audio), "OggS") || !strings.Contains(string(audio[:min(len(audio), 128)]), "OpusHead")) {
@@ -160,16 +157,34 @@ func main() {
 			(len(image) >= 3 && image[0] == 0xff && image[1] == 0xd8 && image[2] == 0xff)) {
 			log.Fatal("BOT_GREETING_IMAGE_FILE must be PNG or JPEG")
 		}
+		if len(adImage)>0 && !(strings.HasPrefix(string(adImage),"\x89PNG\r\n\x1a\n") ||
+			(len(adImage)>=3&&adImage[0]==0xff&&adImage[1]==0xd8&&adImage[2]==0xff)) {
+			log.Fatal("BOT_ADS_IMAGE_FILE must be PNG or JPEG")
+		}
+		if len(adVideo)>0 && !(len(adVideo)>=12&&string(adVideo[4:8])=="ftyp") {
+			log.Fatal("BOT_ADS_VIDEO_FILE must be MP4 (up to 8MiB)")
+		}
 		cfg := outbox.Config{
 			DataDir: dataDir, GreetingCooldown: 24 * time.Hour,
 			CRMInstanceID: crmInstanceID,
 			OperationalAuthorization: opAuth,
 			AdAudioFixture: audio, GreetingImageFixture: image,
-			AdWelcomeText: env("BOT_ADS_RESPONSE_TEXT", "Oii! Tudo bem? 🎄❤️ Que alegria receber seu contato! Vamos encaminhar sua proposta de Natal 2026 por outro WhatsApp oficial do Estúdio Evidência."),
+			AdImageFixture:adImage,AdVideoFixture:adVideo,
+			AdWelcomeText: env("BOT_ADS_RESPONSE_TEXT", "Oi, {{nome}}! 🎄❤️ Que alegria receber você! No Estúdio Evidência em Tijucas temos cenários especiais de Natal e Ano Novo. Vou te enviar os detalhes e nossa proposta de Natal 2026 chegará pelo WhatsApp oficial do estúdio."),
 			Tenant: env("BOT_TENANT", "estudio-evydencia"),
 			Location: loc, TaskRetention: 7 * 24 * time.Hour,
 			MaxTasksCount: 10000, Senders: senders,
 		}
+		if path:=os.Getenv("BOT_ADS_IMAGE_CAPTION_FILE");path!=""{
+			raw,err:=os.ReadFile(path)
+			if err!=nil||strings.TrimSpace(string(raw))==""{log.Fatal("invalid ad image caption file")}
+			cfg.AdImageCaption=string(raw)
+		}else{cfg.AdImageCaption=env("BOT_ADS_IMAGE_CAPTION","🎄 Natal + Ano Novo no Estúdio Evidência, em Tijucas! Veja nossos pacotes: https://evydencia.com/catalogo/natal")}
+		if path:=os.Getenv("BOT_ADS_VIDEO_CAPTION_FILE");path!=""{
+			raw,err:=os.ReadFile(path)
+			if err!=nil||strings.TrimSpace(string(raw))==""{log.Fatal("invalid ad video caption file")}
+			cfg.AdVideoCaption=string(raw)
+		}else{cfg.AdVideoCaption=os.Getenv("BOT_ADS_VIDEO_CAPTION")}
 		if path := os.Getenv("BOT_GREETING_CAPTION_FILE"); path != "" {
 			raw, err := os.ReadFile(path)
 			if err != nil || strings.TrimSpace(string(raw)) == "" {
