@@ -18,7 +18,7 @@ func TestCTWAReferralThumbnailEnvelopeLimit(t *testing.T){
  })
  if err!=nil{t.Fatal(err)}
  prefix:=`{"event":"Message","instanceId":"ads-uuid","data":{"Info":{"ID":"long-ctwa","Chat":"5548999999999@s.whatsapp.net"},"Message":{"extendedTextMessage":{"text":"Quero conhecer os pacotes do Primeiro Natal em Tijucas","contextInfo":{"externalAdReply":{"thumbnail":"`
- suffix:=`"}}}}}`
+ suffix:=`"}}}}}}`
  for _,tc:=range []struct{size,want int}{{300<<10,202},{2<<20,413}}{
   body:=prefix+strings.Repeat("A",tc.size)+suffix
   req:=httptest.NewRequest(http.MethodPost,"/webhook/ads/"+secret,strings.NewReader(body))
