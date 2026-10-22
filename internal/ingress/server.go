@@ -1,5 +1,5 @@
-// Package ingress provides a safe, durable preview-only webhook intake.
-// It NEVER sends a WhatsApp message or calls the CRM.
+// Package ingress validates and durably acknowledges inbound Evolution Go events.
+// The outbound worker, when enabled, processes events asynchronously.
 package ingress
 
 import (
@@ -167,7 +167,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, 65536)
+	r.Body = http.MaxBytesReader(w, r.Body, 512<<10)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "payload too large or unreadable", 413)
