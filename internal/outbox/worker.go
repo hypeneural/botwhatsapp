@@ -204,24 +204,30 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 		return fmt.Errorf("outbox: failed to record attempt_started: %w", err)
 	}
 
+	// Sender routing is strict when multiple instances are configured.
+	// Missing sender means suppress/fail closed, never use another account's key.
+	sender := w.evolution
+	if len(w.cfg.Senders) != 0 {
+		sender = w.cfg.Senders[task.InstanceID]
+	}
 	// Execute specific step effect
 	switch task.Step {
 	case workflow.SendAdText:
-		if w.evolution == nil {
+		if sender == nil {
 			return w.recordUncertain(task.ID, "evolution sender not configured")
 		}
-		extID, err := w.evolution.SendText(ctx, task.RecipientJID, task.PayloadText)
+		extID, err := sender.SendText(ctx, task.RecipientJID, task.PayloadText)
 		if err != nil {
 			return w.recordUncertain(task.ID, err.Error())
 		}
 		return w.recordConfirmed(task.ID, extID)
 
 	case workflow.SendAdAudio:
-		if w.evolution == nil {
+		if sender == nil {
 			return w.recordUncertain(task.ID, "evolution sender not configured")
 		}
 		// SendMedia with type="audio" produces AudioMessage with PTT: true in Evolution Go 0.7.2
-		extID, err := w.evolution.SendMedia(ctx, task.RecipientJID, "audio", w.cfg.AdAudioFixture, "")
+		extID, err := sender.SendMedia(ctx, task.RecipientJID, "audio", w.cfg.AdAudioFixture, "")
 		if err != nil {
 			// Note: Failure or timeout in audio does NOT block subsequent steps (like CRM)
 			return w.recordUncertain(task.ID, err.Error())
@@ -232,10 +238,10 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 		return w.executeScheduleNatal(ctx, task)
 
 	case workflow.SendGreetingImage:
-		if w.evolution == nil {
+		if sender == nil {
 			return w.recordUncertain(task.ID, "evolution sender not configured")
 		}
-		extID, err := w.evolution.SendMedia(ctx, task.RecipientJID, "image", w.cfg.GreetingImageFixture, task.PayloadCaption)
+		extID, err := sender.SendMedia(ctx, task.RecipientJID, "image", w.cfg.GreetingImageFixture, task.PayloadCaption)
 		if err != nil {
 			return w.recordUncertain(task.ID, err.Error())
 		}
@@ -248,10 +254,10 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 		return w.recordConfirmed(task.ID, extID)
 
 	case workflow.SendMenuReply:
-		if w.evolution == nil {
+		if sender == nil {
 			return w.recordUncertain(task.ID, "evolution sender not configured")
 		}
-		extID, err := w.evolution.SendText(ctx, task.RecipientJID, task.PayloadText)
+		extID, err := sender.SendText(ctx, task.RecipientJID, task.PayloadText)
 		if err != nil {
 			return w.recordUncertain(task.ID, err.Error())
 		}
