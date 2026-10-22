@@ -71,11 +71,18 @@ func main() {
 
 		opAuth := os.Getenv("BOT_OPERATIONAL_AUTHORIZATION") == "true"
 
+		var audioFixture []byte
+		audioPath := env("BOT_ADS_AUDIO_FILE", "testdata/test_audio.ogg")
+		if b, err := os.ReadFile(audioPath); err == nil && len(b) > 0 {
+			audioFixture = b
+		}
+
 		outboxCfg := outbox.Config{
 			DataDir:                  dataDir,
 			GreetingCooldown:         24 * time.Hour,
 			CRMInstanceID:            crmInstanceID,
 			OperationalAuthorization: opAuth,
+			AdAudioFixture:           audioFixture,
 			AdWelcomeText:            env("BOT_ADS_RESPONSE_TEXT", "Oii! Tudo bem? 🎄❤️ Que alegria receber seu contato! Vamos enviar a proposta de Natal 2026 por outro WhatsApp oficial do Estúdio Evidência."),
 		}
 
