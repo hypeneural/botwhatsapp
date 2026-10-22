@@ -45,3 +45,10 @@ Não associar número ao UUID Evolution Go sem prova, nem UUID Evolution ao `mes
 - `127.0.0.1:14000` identifica a API no HOST, não dentro de novos containers.
 - Antes de POST CRM real é obrigatória instância de saída numérica explícita (>0), além da confirmação da campanha 415 ou 416 em produção.
 - Skills novas: `.agents/skills/evolution-go-v072-adapter/SKILL.md` e `.agents/skills/bot-contract-tests/SKILL.md`. Essas skills CURADAS apontam para código upstream e não instalam software externo.
+
+## Ajuste comercial oficial — integração CRM campanha 416
+- **Padrão irrevogável dos bots atuais:** `campaign=416` (Natal 2026 **sem nome**); não escolher automaticamente 415 por `PushName`. A opção 415 só pode ser ativada no futuro por decisão expressa.
+- Contratos/retornos reais: `docs/CRM-API-416-PLAYBOOK.md`; `JsonResource::withoutWrapping` coloca `id` na RAIZ do JSON de sucesso; `GET /api/campaigns/schedule/search` permite leitura, mas não autoriza refazer POST incerto.
+- Cliente CRM `internal/crm/client.go`: instância de saída numérica >0, HTTPS para endereço não-local, token raw `Authorization`, `type:campaign`, `use_leads_system:false`. Nunca escrever no CRM.
+- API Evolution Go `internal/evolution/client.go`: `Status`, `SendTextWithID`, `SendMediaWithID`; ler `docs/EVOLUTION-GO-API-FUNCTIONS.md`. Não reutilizar token CRM na Evolution Go.
+- Como AntiGravity pode trabalhar na main simultaneamente, as alterações deste ciclo foram isoladas em `feat/crm-416-contract-20261021`. Integrar por PR após validação de conflitos.\n

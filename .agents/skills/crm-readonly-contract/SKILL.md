@@ -1,21 +1,18 @@
 ---
 name: crm-readonly-contract
-description: Auditar em leitura o contrato já existente da API de campanhas do Evidência CRM.
+description: Integrar como CONSUMIDOR da API de agendamento do Evydência CRM, por padrão campanha Natal 2026 SEM NOME 416, sem nenhuma alteração no CRM.
 ---
-# CRM contrato — absolutamente read-only
+# CRM — skill cirúrgica para Flash Lite
 
-Repositório externo `hypeneural/evydencia-crm`: SOMENTE LEITURA, sem deploy, modificação de código ou dados, criação de campanha, credenciais ou migrations.
+Repositório `hypeneural/evydencia-crm` é **SOMENTE LEITURA**. Comece por `docs/CRM-API-416-PLAYBOOK.md`. Não rodar POST de produção na auditoria.
 
-Arquivos de leitura: `routes/api.php`, `app/Http/Controllers/Api/CampaignScheduledController.php`, `app/Http/Requests/Api/CampaignScheduledRequest.php`, `app/Services/Api/CampaignScheduledService.php`, `app/Helpers/CampaignScheduledContactsHelper.php`, `app/Http/Middleware/SingleAuthentication.php`.
+1. **Padrão fixo sem nome:** `campaign=416`, `contacts="DDDxxxxxxxxx"`. Nunca selecionar 415 automaticamente por `PushName`; nome de WhatsApp não autoriza variante com nome.
+2. `type="campaign"`, `use_leads_system=false`, `instance` é número inteiro positivo de `message_instances.id` no CRM, explícito e validado. Jamais enviar null/usar favorito.
+3. `POST https://evydencia.com/api/campaigns/schedule/execute`; header `Authorization` é token interno raw, SEM Bearer; body JSON. `GET /api/campaigns/schedule/search?campaign.id=416&contacts.phone=DDD...` para reconciliação READ ONLY.
+4. **Atenção crítica:** `JsonResource::withoutWrapping()` em `AppServiceProvider.php`: retorno de sucesso tem `id`, `campaign`, `instance.id`, `status.name` na RAIZ. O bot tolera também formato envelopado, mas não exige `data.id`.
+5. 2xx sem ID positivo ou divergência de campanha/instância = `uncertain`. 401/422 etc = `rejected`. Timeout, 5xx, 429 = `uncertain`, NÃO fazer POST outra vez automaticamente.
+6. GET de pesquisa pode retornar lista raiz; um resultado vazio não prova falha do POST anterior. Exigir reconciliação manual para caso incerto.
+7. Arquivos editáveis **só no bot**: `internal/crm/contract.go`, `internal/crm/client.go`, testes adjacentes. `go test ./internal/crm`; sem Docker da VPS.
+8. Distinguir agendado, aceito no provedor, entregue e lido. Somente agendado é provado pelo POST.
 
-Candidato à integração: `POST /api/campaigns/schedule/execute`. Cabeçalho `Authorization` esperado exatamente como token interno configurado (não assumir 'Bearer'). Campos obrigatórios `campaign` ID numérico, `contacts` texto separado por ponto e vírgula. `instance` opcional: ID numérico de `message_instances` do CRM, **não UUID da Evolution Go**. Validador aceita telefone BR com DDD, 10 ou 11 dígitos sem DDI. Conferir contrato antes do uso.
-
-Ainda NÃO CONFIRMADOS: ID da campanha Natal 2026, instância de envio, token de serviço, URL e se a rota é a correta. Não inventar.
-A aceitação do agendamento não significa mensagem entregue. Timeout ao POST é ambíguo: nunca repetir automaticamente; reconciliar com consulta já disponível se houver prova inequívoca, ou exigir intervenção.
-Entregar tabela: rota, headers, campos, evidência, não-confirmados; sem editar o CRM.
-
-
-## Evidência adicional
-`Natal2026ProposalManifest.php` contém as constantes `with_name:415` e `without_name:416`. Isso NÃO é confirmação de campanhas ativas no banco da produção. `CampaignScheduledResource.php` retorna `data.id` se o agendamento foi criado. No bot, só um retorno parseável com ID positivo e campanha correta pode ser `confirmed`; outros resultados são `uncertain`.
-
-Mesmo que a API legada aceite `instance:null`, o adaptador `internal/crm/client.go` deve exigir um `message_instances.id` explícito e validado antes do primeiro POST real. Não assumir a instância favorita do CRM. Nunca fazer POST durante auditoria.
+Fonte do CRM: `routes/api.php`, `SingleAuthentication.php`, `CampaignScheduledRequest.php`, `CampaignScheduledService.php`, `CampaignScheduledResource.php`, `AppServiceProvider.php`, `Natal2026ProposalManifest.php`, exemplos Scribe.\n

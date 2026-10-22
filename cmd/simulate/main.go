@@ -25,7 +25,7 @@ func main(){
  if d.Action==core.AdsProposal{
   // Dummy CRM instance ID is for PRINT ONLY, never a production credential.
   demo:=999999
-  req,err:=crm.Build(d.CRMPhone,d.Name,&demo)
+  req,err:=crm.BuildWithoutName(d.CRMPhone,&demo)
   if err!=nil{fmt.Fprintln(os.Stderr,"contact format rejected");os.Exit(1)}
   out.CRMPayload=&req
  }

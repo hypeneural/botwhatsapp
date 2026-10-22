@@ -22,3 +22,6 @@
 7. Finalizar com: resumo do diff, SHA commit, testes realmente PASS, riscos novos, pendências para canário e rollback. Se houver contradições, sinalize e PARE sem inventar.
 
 A próxima etapa NÃO tem como objetivo fazer deploy. O objetivo é entregar engine testada offline pronta para ser parametrizada quando as duas sessões forem provisionadas com autorização.
+
+## Complemento CRM 416 (branch separada; não sobrescrever trabalho local)
+O usuário confirmou que a proposta SEM NOME é a PADRÃO. Há atualização concorrente em `feat/crm-416-contract-20261021` (será aberta PR), leia `docs/CRM-API-416-PLAYBOOK.md` e `docs/ADS-416-STATE-MACHINE.md` quando integrada. NÃO reimplementar parse do CRM sem examinar essa PR; a API tem JSON **sem** wrapper por `JsonResource::withoutWrapping()`. O adapter confirma ID/campaign/instance do recibo, e a pesquisa GET é só reconciliação manual. Prevenir duplicidade e não tocar no CRM.\n
