@@ -33,6 +33,12 @@ func TestWebhookPreviewDurableAndIdempotent(t *testing.T){
  srv.ServeHTTP(wrong,httptest.NewRequest("POST","/webhook/ads/"+strings.Repeat("z",40),strings.NewReader(body)))
  if wrong.Code!=401{t.Fatal("missing webhook verification",wrong.Code)}
  wrong=httptest.NewRecorder()
+ srv.ServeHTTP(wrong,httptest.NewRequest("POST","/webhook/ads/extra/"+secret,strings.NewReader(body)))
+ if wrong.Code!=401{t.Fatal("nested path was accepted",wrong.Code)}
+ wrong=httptest.NewRecorder()
+ srv.ServeHTTP(wrong,httptest.NewRequest("POST","/webhook/ads/"+secret+"/extra",strings.NewReader(body)))
+ if wrong.Code!=401{t.Fatal("trailing segment was accepted",wrong.Code)}
+ wrong=httptest.NewRecorder()
  srv.ServeHTTP(wrong,httptest.NewRequest("POST","/webhook/ads/"+secret,strings.NewReader(strings.ReplaceAll(body,"uuid-ads","uuid-greet"))))
  if wrong.Code!=403{t.Fatal("accepted mismatched UUID",wrong.Code)}
 }
