@@ -77,8 +77,8 @@ func (c Client) send(ctx context.Context, path string, payload any) (string, err
 		return "", ErrUnconfirmed
 	}
 	defer res.Body.Close()
-	raw, err := io.ReadAll(io.LimitReader(res.Body, 65537))
-	if err != nil || len(raw) > 65536 || res.StatusCode < 200 || res.StatusCode >= 300 {
+	raw, err := io.ReadAll(io.LimitReader(res.Body, 1<<20))
+	if err != nil || len(raw) > 1<<20 || res.StatusCode < 200 || res.StatusCode >= 300 {
 		return "", ErrUnconfirmed
 	}
 	var response struct {
@@ -86,12 +86,30 @@ func (c Client) send(ctx context.Context, path string, payload any) (string, err
 			Info struct {
 				ID string `json:"ID"`
 			} `json:"Info"`
+			Key struct {
+				ID string `json:"id"`
+			} `json:"Key"`
+			ID string `json:"id"`
 		} `json:"data"`
+		ID string `json:"id"`
 	}
-	if json.Unmarshal(raw, &response) != nil || response.Data.Info.ID == "" {
+	if json.Unmarshal(raw, &response) != nil {
 		return "", ErrUnconfirmed
 	}
-	return response.Data.Info.ID, nil
+	msgID := response.Data.Info.ID
+	if msgID == "" {
+		msgID = response.Data.Key.ID
+	}
+	if msgID == "" {
+		msgID = response.Data.ID
+	}
+	if msgID == "" {
+		msgID = response.ID
+	}
+	if msgID == "" {
+		return "", ErrUnconfirmed
+	}
+	return msgID, nil
 }
 
 func (c Client) SendText(ctx context.Context, phone, text string) (string, error) {
