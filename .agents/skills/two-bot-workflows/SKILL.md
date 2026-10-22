@@ -19,3 +19,8 @@ Testes locais mockados: mensagem do anúncio, fallback, imagem+caption, menu, du
 Já existem `internal/core`, `internal/workflow`, `internal/ingress`, `internal/evolution`, `internal/crm` e `cmd/botwhatsapp`. A versão publicada é de **PREVIEW**, sem qualquer envio. Primeiro `go test ./...`; inspecionar `docs/IMPLEMENTATION-NEXT.md`.
 
 NÃO conectar imediatamente `SendText`, `SendMedia` ou `Schedule` dentro do handler: implementar worker e outbox durável com claims por lead (contato+campanha), separadas do hash (instância+event+messageID). Registrar `attempt_started` e fsync antes de POST; após crash, resultado desconhecido fica suspenso, nunca repetir. Persistir pausa humana, cooldown e opt-out. Campanha com nome 415 ou sem nome 416, ambas condicionadas à configuração operacional. Exigir ID numérico de instância CRM real (>0). Cuidado com LID e SenderAlt: somente JID telefônico autoritativo pode preencher CRM. Teste mockado de conexão/campanha apenas.
+
+## Fix contratual 416 (21/10/2026)
+A campanha Ads utiliza **SOMENTE 416 sem nome**. Use `crm.BuildWithoutName(nationalPhone, &messageInstanceID)`; mesmo que o evento inclua `PushName`, não o enviar. `BuildWithName` e campanha 415 permanecem opcionais e NÃO fazem parte deste fluxo. Leia `docs/ADS-416-STATE-MACHINE.md` e `docs/CRM-API-416-PLAYBOOK.md`.
+
+No worker futuro: GET de status GO pode ajudar a detectar desconexão, mas não autoriza repetir envios incertos. Chamar CRM somente após persistir intention+attempt, exigindo ID positivo da instância de saída CRM e confirmação em produção. NÃO conectar adapters diretamente ao handler do webhook.\n
