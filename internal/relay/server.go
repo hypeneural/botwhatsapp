@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const maxWebhookBytes = 256 << 10
+const maxWebhookBytes = 1 << 20
 type Config struct{
 	Enabled bool
 	ExpectedInstanceUUID string
