@@ -37,3 +37,6 @@ testdata/*.png
 **/transcript.jsonl
 **/secrets.json
 **/credentials.json
+*.override.yaml
+*.override.yml
+deploy/*.override.yaml
