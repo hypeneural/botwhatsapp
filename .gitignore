@@ -13,7 +13,8 @@
 *.tar
 secrets/
 data/
-assets/private/
+assets/*
+!assets/.gitkeep
 reports/*.raw
 reports/*-live.*
 reports/vps-inventory.redacted.md

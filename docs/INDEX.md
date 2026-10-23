@@ -1,15 +1,15 @@
 # Índice — documentação vigente vs histórico
 
 ## COMEÇAR AQUI (canonical)
-- [CTWA em produção futura](CTWA-ROUTING-20261022.md): frase real do Instagram, múltiplos gatilhos, fallback saudação Ads e ordem texto-áudio-imagem-vídeo-CRM.
+- [CTWA em produção vigente](CTWA-ROUTING-20261022.md): fluxo comercial Meta Ads na instância 25287 (`evydencia`), envio de PDF via URL `/static/`, reação `🎄`, fallback de menu e painel web `/painel`.
 - [Skill CTWA](../.agents/skills/ctwa-ads-funnel/SKILL.md): roteiro local para Antigravity.
 
-- [README](../README.md): arquitetura, responsabilidades, dois números e posição atual.
+- [README](../README.md): arquitetura, responsabilidades, instâncias e posição atual.
 - [AGENTS.md](../AGENTS.md): único contrato de instruções para Antigravity.
 - [START-HERE](START-HERE.md): um script e só validações locais.
-- [PRODUCTION-PREFLIGHT-20261022](PRODUCTION-PREFLIGHT-20261022.md): achados da revisão final do código e gates ainda fechados.
+- [PRODUCTION-PREFLIGHT-20261022](PRODUCTION-PREFLIGHT-20261022.md): achados da revisão do código e gates operacionais.
 - [RELAY-ROLLOUT-GATES](RELAY-ROLLOUT-GATES.md): mudança de webhook segura SEM mover status-engine de 8050.
-- [deploy/README](../deploy/README.md): blueprint de staging desativado e rede privada.
+- [deploy/README](../deploy/README.md): blueprint de deploy e rede privada.
 - [CRM API 416](CRM-API-416-PLAYBOOK.md): endpoint oficial existente e respostas.
 - [MULTIINSTANCE](MULTIINSTANCE-ARCHITECTURE.md): registro de IDs GO e separação de tokens.
 - [SECURITY](SECURITY.md): cuidados com dados e rollback.

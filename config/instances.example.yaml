@@ -18,7 +18,7 @@ crm:
 instances:
   paid_traffic:
     enabled: false
-    business_phone_e164: "554832200440"
+    business_phone_e164: "5548996425287" # Migrado de 554832200440 (bloqueado em 22/10)
     instance_uuid: null
     token_env: EVOLUTION_ADS_APIKEY
     exact_ad_phrases_file: config/ads-triggers.txt # FONTE REAL no runtime
