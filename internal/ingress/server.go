@@ -20,16 +20,17 @@ import (
 )
 
 type Settings struct {
-	Enabled        bool
-	AdsSecret      string
-	GreetingSecret string
-	Core           core.Config
-	SpoolDir       string
-	StaticDir      string
-	OnDecision     func(core.Decision) error
-	Registry       *instances.Registry
-	Secrets        map[string]string // Slug -> Secret
-	MaxBodyBytes   int64
+	Enabled          bool
+	AdsSecret        string
+	GreetingSecret   string
+	Core             core.Config
+	SpoolDir         string
+	StaticDir        string
+	OnDecision       func(core.Decision) error
+	Registry         *instances.Registry
+	Secrets          map[string]string // Slug -> Secret
+	MaxBodyBytes     int64
+	DashboardHandler http.Handler
 }
 
 type Server struct {
@@ -80,6 +81,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(r.URL.Path, "/static/") && (r.Method == http.MethodGet || r.Method == http.MethodHead) && s.settings.StaticDir != "" {
 		http.StripPrefix("/static/", http.FileServer(http.Dir(s.settings.StaticDir))).ServeHTTP(w, r)
 		return
+	}
+	if (r.URL.Path == "/painel" || r.URL.Path == "/dashboard" || strings.HasPrefix(r.URL.Path, "/api/dashboard/")) && r.Method == http.MethodGet {
+		if s.settings.DashboardHandler != nil {
+			s.settings.DashboardHandler.ServeHTTP(w, r)
+			return
+		}
 	}
 	// NO request logging: URL contains a secret.
 	if r.Method != "POST" {

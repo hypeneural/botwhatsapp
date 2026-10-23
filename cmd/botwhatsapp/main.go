@@ -12,6 +12,7 @@ import (
 
 	"github.com/hypeneural/botwhatsapp/internal/core"
 	"github.com/hypeneural/botwhatsapp/internal/crm"
+	"github.com/hypeneural/botwhatsapp/internal/dashboard"
 	"github.com/hypeneural/botwhatsapp/internal/evolution"
 	"github.com/hypeneural/botwhatsapp/internal/ingress"
 	"github.com/hypeneural/botwhatsapp/internal/instances"
@@ -267,13 +268,15 @@ func main() {
 			maxBodyBytes = v
 		}
 	}
+	dashHandler := dashboard.NewHandler(dataDir, env("BOT_DASHBOARD_TOKEN", ""))
 	h, err := ingress.New(ingress.Settings{
 		Enabled: enabled, AdsSecret: secrets["ads"],
 		GreetingSecret: secrets["greeting"],
 		SpoolDir:       dataDir, Core: coreCfg, OnDecision: onDecision,
 		Registry: reg, Secrets: secrets,
-		StaticDir:    env("BOT_ASSETS_DIR", "./assets"),
-		MaxBodyBytes: maxBodyBytes,
+		StaticDir:        env("BOT_ASSETS_DIR", "./assets"),
+		MaxBodyBytes:     maxBodyBytes,
+		DashboardHandler: dashHandler,
 	})
 	if err != nil {
 		log.Fatalf("invalid webhook configuration: %v", err)
