@@ -82,7 +82,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.StripPrefix("/static/", http.FileServer(http.Dir(s.settings.StaticDir))).ServeHTTP(w, r)
 		return
 	}
-	if (r.URL.Path == "/painel" || r.URL.Path == "/dashboard" || strings.HasPrefix(r.URL.Path, "/api/dashboard/")) && r.Method == http.MethodGet {
+	if (r.URL.Path == "/painel" || r.URL.Path == "/dashboard" || strings.HasPrefix(r.URL.Path, "/api/dashboard/")) && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
 		if s.settings.DashboardHandler != nil {
 			s.settings.DashboardHandler.ServeHTTP(w, r)
 			return
