@@ -32,7 +32,7 @@ instances:
     image_caption_file: config/ads-image-caption.txt
   greeting:
     enabled: false
-    business_phone_e164: "5548996425287"
+    business_phone_e164: null # nao reutilizar 5287 do papel paid_traffic
     instance_uuid: null
     token_env: EVOLUTION_GREETING_APIKEY
     image_file: null
