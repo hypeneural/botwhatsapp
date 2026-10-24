@@ -1,3 +1,5 @@
+> **Atualização 24/10/2026:** os anúncios P24 são destinados ao 5287. Referências ao 0440 neste documento são HISTÓRICAS. Para o papel Ads, exigir `BOT_ADS_PHONE` explícito e approved 5287; não configurar papel Greeting duplicado, usar `BOT_ADS_FALLBACK_MENU`. Não fazer deploy ou mexer no webhook/status-engine.
+
 ---
 name: ctwa-ads-funnel
 description: Validar e manter o roteamento real CTWA Instagram e menu de saudação do Estúdio Evidência (Ads 48 3220-0440 e futura Saudação 48 99642-5287) sem enviar mensagens.
