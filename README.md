@@ -1,6 +1,6 @@
 # BotWhatsApp — Estúdio Evidência
 
-Serviço Go independente para dois workflows do WhatsApp no Estúdio Evidência, integrado à **Evolution Go 0.7.2 instalada** e à **API existente do Evidência CRM**. O número conectado aos anúncios recebe primeiro tratamento CTWA configurável, com saudação genérica se a frase não corresponder. Não modificar o código, banco ou infraestrutura do CRM.
+Serviço Go independente para dois workflows do WhatsApp no Estúdio Evidência, integrado à **Evolution Go 0.7.2 instalada** e à **API existente do Evidência CRM**. O número conectado aos anúncios recebe primeiro tratamento CTWA configurável, com saudação genérica se a frase não corresponder. **Operação atual anunciada: número final 5287; a referência ao 0440 é histórica e não deve ser configurada como Ads.** Não modificar o código, banco ou infraestrutura do CRM.
 
 ## Estado em 22/10/2026
 
@@ -14,11 +14,11 @@ Serviço Go independente para dois workflows do WhatsApp no Estúdio Evidência,
 
 | Canal | WhatsApp | Plataforma e função |
 |---|---|---|
-| Anúncios Meta | **48 3220-0440** | Evolution Go; gatilho literal da campanha, texto e áudio PTT; agenda pelo CRM |
-| Saudação/Menu | **48 99642-5287** | Evolution Go; imagem única com legenda e opções 1–5, cooldown 24h, pausa humana |
+| Anúncios Meta (atual, sujeito a readback de produção) | **final 5287** | Evolution Go no papel Ads; gatilho de frase exata e fallback de saudação, fluxo comercial condicionado aos gates |
+| Saudação/Menu | **final 5287 no mesmo papel Ads, como fallback** | Não configurar segundo papel Greeting com o mesmo telefone: Registry rejeita duplicação; um segundo papel exige outro número distinto e aprovação |
 | Emissor da proposta | Configurado no CRM | Número do CRM escolhido por `message_instances.id` explícito (relato: instância 1), não confundir com a saudação |
 
-O inbound da instância `anderson` tem um webhook ocupado pelo serviço de status. **Nunca apontá-lo diretamente ao bot**, nem ocupar o :8050 ou alterar o status-engine para :8051.
+O antigo 0440 permanece referência histórica somente. O inbound da instância `anderson` tinha um webhook ocupado pelo serviço de status. **Nunca apontá-lo diretamente ao bot**, nem ocupar o :8050 ou alterar o status-engine para :8051.
 
 ## Fluxo CTWA ativo no código (configuração comercial ainda OFF)
 
@@ -27,7 +27,7 @@ O inbound da instância `anderson` tem um webhook ocupado pelo serviço de statu
 - Etapas do anúncio: **texto opcionalmente personalizado → áudio PTT → imagem opcional com caption → vídeo MP4 opcional com caption → CRM 416 sem nome**. Falha/ausência de mídia é registrada, sem reenvio cego nem bloqueio do CRM; o CRM só é acionado com autorização/lead validado.
 - Um segundo clique do mesmo contato durante `BOT_ADS_FLOW_COOLDOWN_HOURS` (24h padrão) não reinicia texto, áudio, imagem, vídeo ou CRM; contato opt-out e pausa humana são preservados por atualização atômica.
 - Eventos que chegam apenas com `@lid`, sem JID telefônico validado, não disparam proposta; não há garantia de retransmissão posterior com telefone.
-- A saudação usa uma imagem única com legenda quando configurada, senão envia o texto do menu 1–5. O número final **5287** terá somente saudação, em instância própria quando pareada.
+- A saudação usa uma imagem única com legenda quando configurada, senão envia o texto do menu 1–5. No número final **5287**, a saudação é o fallback do papel Ads para mensagens não reconhecidas. Não presumir que exista outra instância Greeting pareada no mesmo número.
 - Webhook com metadados CTWA agora aceita até 1 MiB (limite, não garantia de aceitar qualquer miniatura). Exemplo sanitizado `testdata/ctwa-first-natal.json`.
 - Leia `docs/CTWA-ROUTING-20261022.md` para decisões e ressalvas.
 
