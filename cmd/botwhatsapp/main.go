@@ -61,6 +61,23 @@ func main() {
 		log.Fatalf("invalid ad trigger configuration: %T", err)
 	}
 
+    // The configured identity must be explicit for each enabled role.
+    // Do not fallback to the disconnected 0440 or map the same phone twice.
+    adsPhone := ""
+    greetingPhone := ""
+    if adsUUID != "" {
+        adsPhone, err = adsPhoneFromEnv(os.Getenv)
+        if err != nil {
+            log.Fatal(err)
+        }
+    }
+    if greetingUUID != "" {
+        greetingPhone, err = greetingPhoneFromEnv(os.Getenv, adsPhone)
+        if err != nil {
+            log.Fatal(err)
+        }
+    }
+
 	defs := make([]instances.Definition, 0, 2)
 	secrets := make(map[string]string)
 	senders := make(map[string]outbox.EvolutionSender)
@@ -71,7 +88,7 @@ func main() {
 	if adsUUID != "" {
 		defs = append(defs, instances.Definition{
 			Slug: "ads", InstanceUUID: adsUUID,
-			BusinessPhoneE164: env("BOT_ADS_PHONE", "554832200440"),
+			BusinessPhoneE164: adsPhone,
 			Role:              instances.Ads, Enabled: true, TokenEnv: "EVOLUTION_ADS_APIKEY",
 			WebhookSecretEnv: "BOT_ADS_WEBHOOK_SECRET",
 			AdsTriggers:      triggers, AdsFallback: env("BOT_ADS_FALLBACK_MENU", "true") == "true", CRMAllowed: true,
@@ -88,7 +105,7 @@ func main() {
 	if greetingUUID != "" {
 		defs = append(defs, instances.Definition{
 			Slug: "greeting", InstanceUUID: greetingUUID,
-			BusinessPhoneE164: env("BOT_GREETING_PHONE", "5548996425287"),
+			BusinessPhoneE164: greetingPhone,
 			Role:              instances.Greeting, Enabled: true, TokenEnv: "EVOLUTION_GREETING_APIKEY",
 			WebhookSecretEnv: "BOT_GREETING_WEBHOOK_SECRET",
 		})
