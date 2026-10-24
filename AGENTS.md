@@ -1,3 +1,9 @@
+## P24 — regra vigente de identidade CTWA (24/10/2026)
+- Os anúncios novos Meta Ads apontam exclusivamente ao WhatsApp final **5287**. 0440 é histórico: NÃO usar para Ads, nem recuperar. `cmd/botwhatsapp/phone_config.go` exige que o papel Ads habilitado tenha `BOT_ADS_PHONE` explícito igual ao contrato vigente; sem variável, inicialização falha em vez de retornar ao 0440.
+- O mesmo 5287 **não pode ser registrado simultaneamente** como papéis Ads e Greeting; a saudação genérica ocorre via `BOT_ADS_FALLBACK_MENU=true` no papel Ads. `BOT_GREETING_INSTANCE_UUID` só deve ser configurado quando houver telefone DISTINTO e autorizado. `.env.example` não liga outbound. Nenhum deploy/alteração de webhook é permitido por este ajuste.
+- `docs/CTWA-ROUTING-20261022.md` é atual para 5287. README/skill/trechos abaixo com 0440 descrevem histórico e não constituem instrução operacional.
+- Prova Gate CTWA requer `Meta CTA WhatsApp 5287` + mensagem inicial literal presente em `config/ads-triggers.txt` + confirmação de ingress/bot habilitado em ambiente autorizado + evidência booleana de mensagem recebida. `BOT_ENABLED=false`/flags OFF e docs NÃO comprovam bot funcionando.
+
 # AGENTS.md — BotWhatsApp / Antigravity
 
 **Fonte canônica de instruções.** O arquivo `agent.md` é um alias. Leia `docs/START-HERE.md` e a skill `.agents/skills/relay-local-preflight/SKILL.md`.
