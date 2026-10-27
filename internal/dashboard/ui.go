@@ -319,7 +319,7 @@ footer {
         <option value="all">Todas as origens</option><option value="meta_ads">Meta Ads</option><option value="normal">Normal / sem anúncio comprovado</option>
       </select>
       <select id="eventStatus" onchange="renderEvents()" aria-label="Filtrar situação">
-        <option value="all">Todos os status</option><option value="crm_aceito">CRM aceitou</option><option value="crm_rejeitado">CRM rejeitou</option><option value="incerto">Incerto</option><option value="pendente">Pendente</option><option value="ignorado">Ignorado</option>
+        <option value="all">Todos os status</option><option value="crm_aceito">CRM aceitou</option><option value="crm_rejeitado">CRM rejeitou</option><option value="incerto">Incerto</option><option value="pendente">Pendente</option><option value="sem_tarefas">Sem execução registrada</option><option value="ignorado">Ignorado</option>
       </select>
       <select id="eventLimit" onchange="fetchData()" aria-label="Quantidade de eventos">
         <option value="50">Últimos 50</option><option value="150" selected>Últimos 150</option><option value="500">Últimos 500</option>
@@ -519,7 +519,7 @@ function renderEvents() {
   const labels = {
     crm_aceito:'CRM aceitou', crm_rejeitado:'CRM rejeitou', incerto:'Incerto / investigar',
     pendente:'Pendente', ignorado:'Ignorado', opt_out:'Opt-out',
-    recebido:'Recebido', finalizado_local:'Fluxo local finalizado', em_processamento:'Em andamento'
+    recebido:'Recebido', sem_tarefas:'Sem execução registrada', finalizado_local:'Fluxo local finalizado', em_processamento:'Em andamento'
   };
   const rows = currentEvents.filter(e => {
     if (src !== 'all' && e.source !== src) return false;
