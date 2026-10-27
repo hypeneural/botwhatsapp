@@ -50,6 +50,7 @@ type Decision struct {
  MessageID string `json:"message_id"`
  PhoneE164 string `json:"phone_e164"`
  ReplyJID string `json:"reply_jid,omitempty"`
+ LIDAlias string `json:"lid_alias,omitempty"`
  CRMPhone string `json:"crm_phone,omitempty"`
  Name string `json:"name,omitempty"`
  Option string `json:"option,omitempty"`
@@ -93,6 +94,13 @@ func Select(e Envelope,c Config) Decision {
  if strings.HasSuffix(chat,"@g.us")||strings.HasSuffix(chat,"@newsletter")||strings.Contains(chat,"broadcast"){d.Reason="non_private_chat";return d}
  // Keep the chat JID for replies. A LID's digits are never a phone number.
  d.ReplyJID=chat
+ // Some Evolution versions swap phone JID into Chat and preserve the LID in
+ // SenderAlt. Store ONLY the explicit paired alias; never treat it as a phone.
+ switch {
+ case strings.HasSuffix(chat,"@lid"): d.LIDAlias=chat
+ case strings.HasSuffix(e.Data.Info.SenderAlt,"@lid"): d.LIDAlias=e.Data.Info.SenderAlt
+ case strings.HasSuffix(e.Data.Info.Sender,"@lid"): d.LIDAlias=e.Data.Info.Sender
+ }
  // Preserve the self-declared WhatsApp display name on unresolved @lid events.
  // Do not infer a phone number from the name or from LID digits.
  name:=strings.TrimSpace(e.Data.Info.PushName)
