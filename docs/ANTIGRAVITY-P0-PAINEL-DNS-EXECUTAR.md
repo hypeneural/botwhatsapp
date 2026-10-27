@@ -34,6 +34,8 @@ python3 scripts/sync-ctwa-crm-names-readonly.py \
 ```
 Usa token já existente somente por GET /api/v1/extension/customer-context; requer ability extension:customer-read. Se o token não tiver essa ability, **SKIP**, não alargar escopo por conta própria. Se preview conferir caminho e contagens, executar `--apply` (até 40 GET por rodada), registrar só contagens e sem PII. Conferir que a cache 0600 no volume está legível pelo UID do container. NÃO apagar journal, claims, opt-outs ou contatos.
 
+Rodar auditoria de identidade sem dados pessoais: `python3 scripts/audit-ctwa-identities-readonly.py --spool /var/lib/docker/volumes/botwhatsapp-stage_botwhatsapp_data/_data`. 
+
 Diagnosticar por contagem agregada quantos eventos são @lid sem SenderAlt; confirmar versão real da Evolution, e que Info.Sender/SenderAlt vem ou não vem no payload. Não converter LID em telefone e nunca disparar tentativa comercial para descobrir número. Eventos antigos só podem ser corrigidos se houver evidência preservada de associação exata.
 
 ## Fase 3 — DNS e proxy, sem interferir em outras rotas
