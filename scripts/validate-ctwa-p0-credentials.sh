@@ -13,11 +13,16 @@ bash -n scripts/preflight-ctwa-production-readonly.sh
 bash -n scripts/preflight-ctwa-production-readonly.test.sh
 bash scripts/preflight-ctwa-production-readonly.test.sh
 if command -v python3 >/dev/null 2>&1; then
-  PYTHONDONTWRITEBYTECODE=1 python3 scripts/configure-ctwa-secrets.test.py -v
+  python_cmd=(python3)
+elif command -v py >/dev/null 2>&1; then
+  python_cmd=(py -3)
+elif command -v python >/dev/null 2>&1; then
+  python_cmd=(python)
 else
-  echo "NO_GO: python3 ausente para validar o provisionador de credenciais" >&2
+  echo "NO_GO: Python ausente para validar o provisionador de credenciais" >&2
   exit 2
 fi
+PYTHONDONTWRITEBYTECODE=1 "${python_cmd[@]}" scripts/configure-ctwa-secrets.test.py -v
 if command -v php >/dev/null 2>&1; then
   php -l scripts/issue-ctwa-sanctum-on-crm.php
   php -l scripts/verify-ctwa-sanctum-on-crm.php
