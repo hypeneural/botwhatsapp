@@ -367,8 +367,14 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 					localBlocked = true
 				}
 			}
-			if step.State == string(outbox.TaskUncertain) || step.State == string(outbox.TaskAttemptStarted) {
+			if step.State == string(outbox.TaskUncertain) {
 				uncertain = true
+			} else if step.State == string(outbox.TaskAttemptStarted) {
+				// An attempt started in the last 2 minutes is active in-flight work, not uncertain!
+				// Only classify as uncertain if stalled without completion for over 2 minutes.
+				if time.Since(row.ReceivedAt) > 2*time.Minute {
+					uncertain = true
+				}
 			}
 			if step.State == string(outbox.TaskPending) {
 				pending = true
@@ -442,7 +448,15 @@ func outcome(t outbox.Task) string {
 	switch t.State {
 	case outbox.TaskConfirmed:
 		return "API aceitou (entrega não comprovada)"
-	case outbox.TaskUncertain, outbox.TaskAttemptStarted:
+	case outbox.TaskAttemptStarted:
+		if time.Since(t.AttemptStartedAt) < 2*time.Minute {
+			return "Em execução / aguardando resposta da API"
+		}
+		if strings.Contains(strings.ToLower(t.Error), "http 422") {
+			return "API recusou (HTTP 422 legado)"
+		}
+		return "Sem confirmação conclusiva"
+	case outbox.TaskUncertain:
 		if strings.Contains(strings.ToLower(t.Error), "http 422") {
 			return "API recusou (HTTP 422 legado)"
 		}
