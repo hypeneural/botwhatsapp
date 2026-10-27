@@ -18,6 +18,7 @@ const maxEventRows = 500
 // record. A confirmed Evolution ID is an API acceptance, NOT a delivered/read
 // WhatsApp receipt. Unknown network outcomes must never be displayed as sent.
 type EventStep struct {
+	TaskID       string `json:"-"`
 	Step         string `json:"step"`
 	Provider     string `json:"provider"`
 	State        string `json:"state"`
@@ -194,6 +195,7 @@ func (s *Service) GetEvents(limit int) (EventResult, error) {
 			continue
 		}
 		step := EventStep{
+			TaskID:t.ID,
 			Step:FriendlyStep(string(t.Step)), Provider:"Evolution Go",
 			State:string(t.State), APIResponse:outcome(t),
 			ExternalID:t.ExternalID, Reason:safeEventReason(t.Error),
@@ -213,8 +215,7 @@ func (s *Service) GetEvents(limit int) (EventResult, error) {
 	for i := range result.Events {
 		row := &result.Events[i]
 		sort.Slice(row.Steps,func(a,b int) bool {
-			return row.Steps[a].StartedBRT < row.Steps[b].StartedBRT ||
-				row.Steps[a].StartedBRT == row.Steps[b].StartedBRT && row.Steps[a].Step < row.Steps[b].Step
+			return row.Steps[a].TaskID < row.Steps[b].TaskID
 		})
 		if len(row.Steps)>0 {
 			row.Status = "em_processamento"
