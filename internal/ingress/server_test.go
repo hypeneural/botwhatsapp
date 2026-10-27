@@ -165,7 +165,6 @@ func TestWebhookRegistryMode(t *testing.T) {
 	}
 }
 
-
 func TestStaticMediaServesPDFButNeverDirectoryListings(t *testing.T) {
 	assets := t.TempDir()
 	if err := os.WriteFile(filepath.Join(assets, "Proposta_Natal.pdf"), []byte("%PDF-1.7 test-only"), 0600); err != nil {

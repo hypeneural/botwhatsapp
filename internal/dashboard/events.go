@@ -31,8 +31,8 @@ type EventStep struct {
 
 type EventRow struct {
 	// Private join keys for historical, exact-match LID resolution. Never sent as JSON.
-	phoneE164     string
-	replyJID      string
+	phoneE164      string
+	replyJID       string
 	EventKey       string      `json:"event_key"`
 	ReceivedAt     time.Time   `json:"received_at"`
 	ReceivedAtBRT  string      `json:"received_at_brt"`
@@ -232,7 +232,10 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 	// Resolve display identity ONLY from an earlier verified, exact same LID
 	// or E.164 phone in this loaded window. NEVER guess the phone from LID digits.
 	// Conflicting LID -> phone observations are discarded as ambiguous.
-	type phoneObservation struct { phone, name string; conflicted bool }
+	type phoneObservation struct {
+		phone, name string
+		conflicted  bool
+	}
 	observedLIDs := make(map[string]phoneObservation)
 	knownNames := make(map[string]string)
 	for _, row := range result.Events {

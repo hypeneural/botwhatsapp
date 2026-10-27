@@ -246,15 +246,29 @@ function showStatus(msg, error) {
   $('statusText').textContent=msg;
   $('updatedAt').textContent=state.lastSuccess ? 'Última leitura: '+state.lastSuccess+' (BRT)' : 'Fonte: registros locais do bot.';
 }
-function stepsHTML(steps) {
-  if (!Array.isArray(steps) || !steps.length) return '<span class="plain-note">Nenhuma etapa de API registrada</span>';
+function formatReason(code) {
+  switch (code) {
+    case 'non_private_chat': return 'Status ou grupo (não privado)';
+    case 'unresolved_phone_or_non_private_chat': return 'Identificador sem telefone comprovado';
+    case 'not_new_inbound': return 'Mensagem do próprio bot / sistema';
+    case 'unknown_instance': return 'Instância do WhatsApp não configurada';
+    case 'no_text': return 'Mídia recebida sem legenda / texto';
+    case 'opt_out_requires_persistent_suppression': return 'Contato pediu para parar (opt-out)';
+    default: return code || '';
+  }
+}
+function stepsHTML(steps, status) {
+  if (!Array.isArray(steps) || !steps.length) {
+    if (status === 'ignorado') return '<span class="plain-note">Nenhuma etapa necessária (mensagem ignorada)</span>';
+    return '<span class="plain-note">Nenhuma etapa de API registrada</span>';
+  }
   return '<details class="steps"><summary>Ver '+steps.length+' etapa(s)</summary><ol class="timeline">'+
     steps.map(t => '<li><strong>'+safe(t.step)+'</strong>'+
       '<div>'+safe(t.provider)+' · <span class="resp">'+safe(t.api_response)+'</span></div>'+
       (t.started_brt ? '<div class="sub">Início: '+safe(t.started_brt)+'</div>' : '')+
       (t.completed_brt ? '<div class="sub">Fim: '+safe(t.completed_brt)+'</div>' : '')+
       (t.external_id ? '<div class="sub">Recibo: '+safe(t.external_id)+'</div>' : '')+
-      (t.reason ? '<div class="sub">Motivo: '+safe(t.reason)+'</div>' : '')+'</li>').join('')+
+      (t.reason ? '<div class="sub">Motivo: '+safe(formatReason(t.reason))+'</div>' : '')+'</li>').join('')+
       '</ol></details>';
 }
 function renderEvents() {
@@ -291,8 +305,8 @@ function renderEvents() {
         '<div class="sub">Tipo: '+safe(e.inbound_type || 'Não informado')+'</div>'+trigger+'</td>'+
       '<td data-label="Resultado">'+badge(label[0],label[1])+
         (e.crm_receipt ? '<div class="sub">Despacho: '+safe(e.crm_receipt)+'</div>' : '')+
-        (e.decision_reason ? '<div class="sub">'+safe(e.decision_reason)+'</div>' : '')+'</td>'+
-      '<td data-label="Histórico das APIs">'+stepsHTML(e.steps)+'</td></tr>';
+        (e.decision_reason ? '<div class="sub">'+safe(formatReason(e.decision_reason))+'</div>' : '')+'</td>'+
+      '<td data-label="Histórico das APIs">'+stepsHTML(e.steps, e.status)+'</td></tr>';
   }).join('');
 }
 function renderContacts(){
