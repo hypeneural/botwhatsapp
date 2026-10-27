@@ -62,7 +62,7 @@ check_secret EVIDENCIA_CRM_PROPOSAL_SANCTUM_TOKEN 32
 # Sanctum createToken() emits ID|plainTextToken. This is a shape check only,
 # not proof of permission, expiry, CRM user eligibility or token existence.
 native_token="$(value EVIDENCIA_CRM_PROPOSAL_SANCTUM_TOKEN)"
-if [[ "$native_token" =~ ^[1-9][0-9]*\\|[a-zA-Z0-9]{40,}$ ]]; then
+if [[ "$native_token" =~ ^[1-9][0-9]*\|[a-zA-Z0-9]{40,}$ ]]; then
   pass "formato Sanctum ID|token valido (ability e usuario NAO verificados)"
 else
   fail "token Sanctum fora do formato nativo ID|segredo; nao preencher aleatoriamente"
