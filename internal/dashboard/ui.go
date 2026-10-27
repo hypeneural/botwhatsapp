@@ -237,6 +237,24 @@ footer {
   font-size: 12px;
   color: var(--text-muted);
 }
+
+.event-section { margin: 20px 0 32px; }
+.event-section h2 { font-size: 20px; margin: 0 0 6px; }
+.event-section .hint { margin:0 0 16px;color:var(--text-muted);font-size:13px }
+.event-toolbar {display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.event-toolbar select,.event-toolbar input {color:var(--text);background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:10px}
+.event-toolbar input {min-width:230px;flex:1}
+.event-state {font-weight:650;font-size:12px}
+.event-steps {text-align:left;margin-top:9px;min-width:270px}
+.event-steps summary {cursor:pointer;color:var(--primary);font-weight:600}
+.event-steps ul {padding:9px 0 3px 17px;color:var(--text-muted)}
+.event-steps li {padding:4px 0;font-size:12px;line-height:1.5}
+.event-text {max-width:350px;overflow-wrap:anywhere}
+.event-mini {font-size:12px;color:var(--text-muted)}
+.event-pill {border-radius:7px;padding:4px 8px;background:var(--bg);white-space:nowrap;display:inline-block}
+.event-warning {color:var(--warn-text)}
+.event-failed {color:var(--danger-text)}
+.event-success {color:var(--success-text)}
 </style>
 </head>
 <body>
@@ -285,6 +303,37 @@ footer {
     </div>
   </div>
 
+
+  <section class="event-section" aria-label="Histórico detalhado do bot">
+    <h2>Histórico de mensagens e encaminhamentos</h2>
+    <p class="hint">Mensagens recebidas por ordem de ingresso, com gatilho e etapas de API. Resposta aceita pelo provedor não comprova entrega ou leitura no WhatsApp. Horários no fuso de Brasília.</p>
+    <div class="metrics-grid">
+      <div class="metric-card"><span class="metric-title">Recebidas (janela exibida)</span><span class="metric-val" id="eventReceived">—</span></div>
+      <div class="metric-card"><span class="metric-title">Meta Ads</span><span class="metric-val val-ads" id="eventAds">—</span></div>
+      <div class="metric-card"><span class="metric-title">CRM aceitou</span><span class="metric-val val-crm" id="eventAccepted">—</span></div>
+      <div class="metric-card"><span class="metric-title">CRM rejeitou</span><span class="metric-val event-failed" id="eventRejected">—</span></div>
+      <div class="metric-card"><span class="metric-title">Resultado incerto</span><span class="metric-val event-warning" id="eventUncertain">—</span></div>
+    </div>
+    <div class="event-toolbar">
+      <select id="eventSource" onchange="renderEvents()" aria-label="Filtrar origem">
+        <option value="all">Todas as origens</option><option value="meta_ads">Meta Ads</option><option value="normal">Normal / sem anúncio comprovado</option>
+      </select>
+      <select id="eventStatus" onchange="renderEvents()" aria-label="Filtrar situação">
+        <option value="all">Todos os status</option><option value="crm_aceito">CRM aceitou</option><option value="crm_rejeitado">CRM rejeitou</option><option value="incerto">Incerto</option><option value="pendente">Pendente</option><option value="ignorado">Ignorado</option>
+      </select>
+      <select id="eventLimit" onchange="fetchData()" aria-label="Quantidade de eventos">
+        <option value="50">Últimos 50</option><option value="150" selected>Últimos 150</option><option value="500">Últimos 500</option>
+      </select>
+      <input type="search" id="eventSearch" placeholder="Buscar telefone, nome, texto ou gatilho" oninput="renderEvents()" aria-label="Busca no histórico">
+    </div>
+    <div class="table-wrapper">
+      <table>
+        <thead><tr><th>Recebido (BRT)</th><th>Origem</th><th>Contato</th><th>Mensagem / gatilho</th><th>Decisão</th><th>APIs e respostas</th><th>Resultado</th></tr></thead>
+        <tbody id="eventsTableBody"><tr><td colspan="7" class="empty-state">Carregando histórico...</td></tr></tbody>
+      </table>
+    </div>
+    <p class="hint" style="margin-top:10px">O histórico anterior à atualização pode não ter texto, tipo ou origem disponíveis. O painel não efetua disparos nem tenta novamente tarefas incertas.</p>
+  </section>
   <div class="controls-bar">
     <div class="filter-tabs">
       <button class="tab-btn active" onclick="setFilter('all', this)">Todos (<span id="countAll">0</span>)</button>
@@ -325,6 +374,7 @@ footer {
 
 <script>
 let currentContacts = [];
+let currentEvents = [];
 let activeFilter = 'all';
 let refreshTimer = null;
 
@@ -370,7 +420,24 @@ async function fetchData() {
 
     renderTable();
   } catch (err) {
-    console.error('Falha ao buscar dados:', err);
+    console.error('Falha ao buscar contatos:', err);
+  }
+  try {
+    const count = document.getElementById('eventLimit').value;
+    const resp = await fetch('/api/dashboard/events?limit=' + encodeURIComponent(count), {credentials:'same-origin'});
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const history = await resp.json();
+    currentEvents = history.events || [];
+    const st = history.stats || {};
+    document.getElementById('eventReceived').textContent = st.received || 0;
+    document.getElementById('eventAds').textContent = st.meta_ads || 0;
+    document.getElementById('eventAccepted').textContent = st.crm_accepted || 0;
+    document.getElementById('eventRejected').textContent = st.crm_rejected || 0;
+    document.getElementById('eventUncertain').textContent = st.uncertain || 0;
+    renderEvents();
+  } catch (err) {
+    document.getElementById('eventsTableBody').innerHTML = '<tr><td colspan="7" class="empty-state">Histórico indisponível. Verifique o endpoint protegido /api/dashboard/events.</td></tr>';
+    console.error('Falha ao buscar histórico:', err);
   }
 }
 
@@ -441,6 +508,62 @@ function renderTable() {
       '<td>' + escapeHTML(c.last_step) + '</td>' +
       '<td>' + statusBadges.join(' ') + '</td>' +
     '</tr>';
+  }).join('');
+}
+
+function renderEvents() {
+  const src = document.getElementById('eventSource').value;
+  const status = document.getElementById('eventStatus').value;
+  const q = document.getElementById('eventSearch').value.toLocaleLowerCase('pt-BR').trim();
+  const tbody = document.getElementById('eventsTableBody');
+  const labels = {
+    crm_aceito:'CRM aceitou', crm_rejeitado:'CRM rejeitou', incerto:'Incerto / investigar',
+    pendente:'Pendente', ignorado:'Ignorado', opt_out:'Opt-out',
+    recebido:'Recebido', finalizado_local:'Fluxo local finalizado', em_processamento:'Em andamento'
+  };
+  const rows = currentEvents.filter(e => {
+    if (src !== 'all' && e.source !== src) return false;
+    if (status !== 'all' && e.status !== status) return false;
+    if (!q) return true;
+    return [e.phone,e.name,e.inbound_text,e.trigger_text,e.decision,e.crm_receipt]
+      .some(v => String(v || '').toLocaleLowerCase('pt-BR').includes(q));
+  });
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Nenhum evento encontrado nos registros carregados.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(e => {
+    const isAds = e.source === 'meta_ads';
+    const sourceBadge = isAds
+      ? '<span class="badge badge-ads">Meta Ads</span>'
+      : '<span class="badge badge-org">Normal</span>';
+    const text = escapeHTML(e.inbound_text || '(sem texto salvo)');
+    const trig = e.trigger_matched
+      ? '<div class="event-mini event-success">Gatilho exato: ' + escapeHTML(e.trigger_text || '(legado)') + '</div>'
+      : '<div class="event-mini">Sem gatilho exato' + (e.has_ad_context ? ' · origem anúncio identificada' : '') + '</div>';
+    const steps = Array.isArray(e.steps) ? e.steps : [];
+    const details = steps.length
+      ? '<details class="event-steps"><summary>' + steps.length + ' etapa(s) — conferir recibos</summary><ul>' +
+        steps.map(t => '<li><strong>' + escapeHTML(t.step) + '</strong> · ' +
+        escapeHTML(t.provider) + ' · ' + escapeHTML(t.api_response) +
+        (t.started_brt ? ' · iniciou ' + escapeHTML(t.started_brt) : '') +
+        (t.completed_brt ? ' · terminou ' + escapeHTML(t.completed_brt) : '') +
+        (t.external_id ? ' · recibo ' + escapeHTML(t.external_id) : '') +
+        (t.reason ? ' · ' + escapeHTML(t.reason) : '') +
+        '</li>').join('') + '</ul></details>'
+      : '<span class="event-mini">Nenhuma etapa automática registrada</span>';
+    let statusClass = 'event-warning';
+    if (e.status === 'crm_aceito') statusClass = 'event-success';
+    if (e.status === 'crm_rejeitado' || e.status === 'incerto') statusClass = 'event-failed';
+    return '<tr><td class="time-col">' + escapeHTML(e.received_at_brt) + '</td>' +
+      '<td>' + sourceBadge + '</td>' +
+      '<td><strong>' + escapeHTML(e.name) + '</strong><div class="event-mini">' + escapeHTML(e.phone) + '</div></td>' +
+      '<td class="event-text">' + text + '<div class="event-mini">Tipo: ' + escapeHTML(e.inbound_type) + '</div>' + trig + '</td>' +
+      '<td>' + escapeHTML(e.decision) +
+        (e.decision_reason ? '<div class="event-mini">' + escapeHTML(e.decision_reason) + '</div>' : '') + '</td>' +
+      '<td>' + details + '</td>' +
+      '<td><span class="event-state ' + statusClass + '">' + escapeHTML(labels[e.status] || e.status) + '</span>' +
+      (e.crm_receipt ? '<div class="event-mini">Despacho: ' + escapeHTML(e.crm_receipt) + '</div>' : '') + '</td></tr>';
   }).join('');
 }
 
