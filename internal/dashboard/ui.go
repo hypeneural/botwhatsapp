@@ -1,584 +1,365 @@
 package dashboard
 
-const dashboardHTML = `<!DOCTYPE html>
+// dashboardHTML is an isolated, dependency-free and read-only manager view.
+// Every value loaded from the journal must be escaped before HTML rendering.
+const dashboardHTML = `<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Estúdio Evydência — Painel de Contatos & Tráfego</title>
+<meta name="color-scheme" content="light">
+<title>Evydência | Monitor de mensagens</title>
 <style>
 :root {
-  --bg: #0f172a;
-  --card-bg: #1e293b;
-  --border: #334155;
-  --text: #f8fafc;
-  --text-muted: #94a3b8;
-  --primary: #3b82f6;
-  --primary-hover: #2563eb;
-  --success-bg: #064e3b;
-  --success-text: #34d399;
-  --success-border: #059669;
-  --ads-bg: #14532d;
-  --ads-text: #86efac;
-  --ads-border: #22c55e;
-  --organic-bg: #1e3a8a;
-  --organic-text: #93c5fd;
-  --organic-border: #3b82f6;
-  --warn-bg: #78350f;
-  --warn-text: #fcd34d;
-  --danger-bg: #7f1d1d;
-  --danger-text: #fca5a5;
-  --radius: 12px;
+  font-family: system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  color-scheme:light;
+  --bg:#f6f6f4; --surface:#fff; --ink:#172522; --muted:#576760;
+  --line:#e2e8e3; --accent:#176b50; --soft:#eaf5ef;
+  --warn:#915309; --warnbg:#fff3df; --danger:#a33135; --dangerbg:#fff0ef;
+  --shadow:0 3px 18px rgba(21,43,34,.045);
 }
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background-color: var(--bg);
-  color: var(--text);
-  line-height: 1.5;
-  padding: 24px;
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.48}
+button,input,select{font:inherit}
+button,select{cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #76baa0;outline-offset:3px}
+.shell{max-width:1460px;padding:26px clamp(14px,3vw,42px) 40px;margin:auto}
+.top{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:25px}
+.eyebrow{color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:.12em;font-weight:800}
+h1{font-size:clamp(25px,3vw,32px);line-height:1.16;letter-spacing:-.035em;margin:5px 0 7px}
+h2{font-size:19px;letter-spacing:-.02em;margin:0}
+.description{color:var(--muted);margin:0;max-width:700px}
+.top-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.select,.search{background:#fff;border:1px solid #ccd8d1;border-radius:10px;padding:10px 12px;color:var(--ink);min-height:42px}
+.btn{border:1px solid var(--accent);background:var(--accent);color:#fff;font-weight:700;border-radius:10px;padding:10px 17px;min-height:42px}
+.btn:hover{background:#11543e}
+.btn[disabled]{opacity:.68;cursor:wait}
+.statusline{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:12px 16px;background:#edf5ee;border:1px solid #d7e6da;border-radius:12px;color:#325d44;margin-bottom:18px}
+.statusline.error{background:var(--warnbg);border-color:#ebcf9f;color:var(--warn)}
+.statusline .minor{color:var(--muted);font-size:12px}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:24px}
+.metric{border-radius:14px;background:var(--surface);border:1px solid var(--line);padding:17px 18px;box-shadow:var(--shadow)}
+.metric .value{font-size:32px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums;display:block;margin:9px 0 5px}
+.metric .heading{font-weight:650;color:#52635b;font-size:13px}
+.metric .detail{font-size:12px;color:var(--muted)}
+.metric.attention .value{color:var(--danger)}
+.metric.positive .value{color:var(--accent)}
+.section{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+.section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:21px 21px 14px}
+.section-head .muted{color:var(--muted);font-size:12px;margin:4px 0 0}
+.tools{display:grid;grid-template-columns:1.6fr 1fr 1fr auto;gap:9px;padding:0 21px 18px}
+.search{min-width:0;width:100%}
+.tools .select{width:100%;min-width:0}
+.results{font-size:12px;color:var(--muted);padding:9px 21px;border-top:1px solid var(--line);background:#fafcfb}
+.scroll{overflow-x:auto}
+.data-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.data-table th{text-align:left;padding:12px 15px;color:#64726a;background:#f9fbf9;font-size:11px;font-weight:800;letter-spacing:.045em;text-transform:uppercase;white-space:nowrap;border-bottom:1px solid var(--line)}
+.data-table td{vertical-align:top;padding:17px 15px;border-bottom:1px solid #edf0ed;overflow-wrap:anywhere}
+.data-table tr:last-child td{border-bottom:0}
+.data-table tbody tr:hover{background:#fbfcfb}
+.cell-main{font-weight:750}
+.sub{font-size:12px;color:var(--muted);margin-top:4px}
+.date{font-weight:750;font-variant-numeric:tabular-nums}
+.pill{font-weight:750;font-size:11px;border-radius:30px;padding:5px 9px;display:inline-flex;align-items:center;line-height:1.3}
+.pill.ads{background:#e3f3ec;color:#165b42}
+.pill.normal{background:#edf0f4;color:#536275}
+.pill.success{background:#e3f4e8;color:#14603f}
+.pill.danger{background:#ffedeb;color:#9c2b2d}
+.pill.warning{background:#fff1d9;color:#875313}
+.pill.neutral{background:#eef1ef;color:#526258}
+.plain-note{color:var(--muted);font-size:12px}
+.message{font-size:13px;overflow-wrap:anywhere;max-width:420px}
+.trigger{font-size:12px;color:var(--accent);font-weight:650;margin-top:5px}
+.steps{margin:8px 0 0}
+.steps summary{color:var(--accent);font-weight:750;cursor:pointer;font-size:12px;list-style-position:inside}
+.steps[open]{background:#f8fbf8;border:1px solid var(--line);border-radius:10px;padding:9px}
+.timeline{list-style:none;margin:11px 0 0;padding:0}
+.timeline li{border-left:2px solid #cbdcd0;margin-left:6px;padding:0 0 16px 14px;position:relative;font-size:12px;line-height:1.5}
+.timeline li:last-child{padding-bottom:2px}
+.timeline li:before{content:"";width:9px;height:9px;border-radius:50%;background:var(--accent);position:absolute;left:-6px;top:3px}
+.timeline strong{display:block;font-size:13px}
+.timeline .resp{font-weight:650}
+.hint{padding:13px 20px;color:var(--muted);font-size:12px;border-top:1px solid var(--line);background:#fbfcfb}
+.secondary-panel{padding:0 19px}
+.secondary-panel>summary{padding:19px 2px;font-size:15px;font-weight:750;cursor:pointer}
+.secondary-body{border-top:1px solid var(--line);padding:17px 0}
+.contact-table{width:100%;border-collapse:collapse}
+.contact-table th,.contact-table td{text-align:left;border-bottom:1px solid var(--line);padding:11px 8px;font-size:12px}
+.contact-table th{color:var(--muted)}
+#contactSearch{max-width:320px;margin-bottom:12px}
+.empty{text-align:center;padding:34px 15px;color:var(--muted)}
+footer{color:#65746b;font-size:12px;padding:12px 2px 0}
+.hide{display:none!important}
+@media(max-width:1060px){
+ .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .tools{grid-template-columns:1fr 1fr}
+ .tools .search{grid-column:1/-1}
 }
-.container { max-width: 1400px; margin: 0 auto; }
-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 16px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 24px;
+@media(max-width:700px){
+ .shell{padding:14px 10px 25px}
+ .top{display:block;padding:8px 5px 0}
+ .description{margin-bottom:14px}
+ .top-actions{justify-content:space-between}
+ .top-actions select{flex:1}
+ .metrics{gap:8px;margin-bottom:14px}
+ .metric{padding:14px 13px;border-radius:12px}
+ .metric .value{font-size:27px}
+ .metric .heading{font-size:12px}
+ .metric .detail{font-size:11px}
+ .section{border-radius:13px}
+ .section-head{padding:16px 15px 13px}
+ .tools{padding:0 14px 13px;gap:8px;grid-template-columns:1fr 1fr}
+ .tools .search{grid-column:1/-1}
+ .tools .select{font-size:12px}
+ .results{padding:8px 14px}
+ .scroll{overflow:visible}
+ .data-table,.data-table tbody,.data-table tr,.data-table td{display:block;width:100%}
+ .data-table thead{display:none}
+ .data-table tbody tr{padding:13px 14px;border-bottom:9px solid var(--bg)}
+ .data-table tbody tr:last-child{border-bottom:0}
+ .data-table td{border:0;padding:3px 0}
+ .data-table td:before{content:attr(data-label);font-size:11px;display:block;color:#6b786e;font-weight:650;margin-bottom:3px}
+ .data-table td[data-label="Contato"]:before{display:none}
+ .data-table td[data-label="Resultado"]{padding-top:8px}
+ .message{max-width:none}
+ .steps[open]{padding:8px}
+ .contact-table{display:block;overflow-x:auto}
+ footer{padding:12px}
 }
-.title-group h1 { font-size: 24px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
-.title-group p { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
-.live-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(34, 197, 94, 0.15);
-  color: #4ade80;
-  border: 1px solid rgba(34, 197, 94, 0.4);
-  padding: 4px 10px;
-  border-radius: 9999px;
-  font-size: 12px;
-  font-weight: 600;
-}
-.live-dot {
-  width: 8px;
-  height: 8px;
-  background: #22c55e;
-  border-radius: 50%;
-  box-shadow: 0 0 8px #22c55e;
-  animation: pulse 2s infinite;
-}
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-.header-actions { display: flex; align-items: center; gap: 12px; }
-button.btn {
-  background: var(--primary);
-  color: #fff;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: background 0.2s;
-}
-button.btn:hover { background: var(--primary-hover); }
-select.dropdown {
-  background: var(--card-bg);
-  color: var(--text);
-  border: 1px solid var(--border);
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-size: 13px;
-  cursor: pointer;
-}
-.metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
-}
-.metric-card {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px 20px;
-  display: flex;
-  flex-direction: column;
-}
-.metric-title { font-size: 13px; color: var(--text-muted); font-weight: 500; }
-.metric-val { font-size: 28px; font-weight: 700; margin-top: 6px; }
-.metric-sub { font-size: 12px; margin-top: 4px; color: var(--text-muted); }
-.val-ads { color: var(--ads-text); }
-.val-org { color: var(--organic-text); }
-.val-crm { color: var(--success-text); }
-.val-cooldown { color: var(--warn-text); }
-.controls-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 16px;
-  background: var(--card-bg);
-  padding: 12px 16px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-}
-.search-box {
-  display: flex;
-  align-items: center;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 6px 12px;
-  min-width: 280px;
-}
-.search-box input {
-  background: transparent;
-  border: none;
-  outline: none;
-  color: var(--text);
-  font-size: 14px;
-  width: 100%;
-}
-.filter-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
-.tab-btn {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  padding: 6px 14px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.tab-btn:hover { color: var(--text); border-color: var(--primary); }
-.tab-btn.active {
-  background: var(--primary);
-  color: #fff;
-  border-color: var(--primary);
-}
-.table-wrapper {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow-x: auto;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-  font-size: 14px;
-}
-th {
-  background: rgba(15, 23, 42, 0.6);
-  color: var(--text-muted);
-  font-weight: 600;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
-}
-td {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
-  vertical-align: middle;
-}
-tr:last-child td { border-bottom: none; }
-tr:hover td { background: rgba(255, 255, 255, 0.02); }
-.lead-info { display: flex; align-items: center; gap: 10px; }
-.avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: #334155;
-  color: #e2e8f0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 13px;
-  flex-shrink: 0;
-}
-.avatar.ads { background: #166534; color: #bbf7d0; }
-.avatar.org { background: #1e40af; color: #bfdbfe; }
-.lead-name { font-weight: 600; color: var(--text); }
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.badge-ads { background: var(--ads-bg); color: var(--ads-text); border: 1px solid var(--ads-border); }
-.badge-org { background: var(--organic-bg); color: var(--organic-text); border: 1px solid var(--organic-border); }
-.badge-crm-done { background: var(--success-bg); color: var(--success-text); border: 1px solid var(--success-border); }
-.badge-crm-none { background: rgba(148, 163, 184, 0.1); color: var(--text-muted); }
-.badge-cooldown { background: var(--warn-bg); color: var(--warn-text); border: 1px solid #d97706; }
-.badge-optout { background: var(--danger-bg); color: var(--danger-text); border: 1px solid #ef4444; }
-.time-col { color: var(--text-muted); font-size: 13px; white-space: nowrap; }
-.empty-state { text-align: center; padding: 48px; color: var(--text-muted); }
-footer {
-  margin-top: 24px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.event-section { margin: 20px 0 32px; }
-.event-section h2 { font-size: 20px; margin: 0 0 6px; }
-.event-section .hint { margin:0 0 16px;color:var(--text-muted);font-size:13px }
-.event-toolbar {display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
-.event-toolbar select,.event-toolbar input {color:var(--text);background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:10px}
-.event-toolbar input {min-width:230px;flex:1}
-.event-state {font-weight:650;font-size:12px}
-.event-steps {text-align:left;margin-top:9px;min-width:270px}
-.event-steps summary {cursor:pointer;color:var(--primary);font-weight:600}
-.event-steps ul {padding:9px 0 3px 17px;color:var(--text-muted)}
-.event-steps li {padding:4px 0;font-size:12px;line-height:1.5}
-.event-text {max-width:350px;overflow-wrap:anywhere}
-.event-mini {font-size:12px;color:var(--text-muted)}
-.event-pill {border-radius:7px;padding:4px 8px;background:var(--bg);white-space:nowrap;display:inline-block}
-.event-warning {color:var(--warn-text)}
-.event-failed {color:var(--danger-text)}
-.event-success {color:var(--success-text)}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important}}
 </style>
 </head>
 <body>
-<div class="container">
-  <header>
-    <div class="title-group">
-      <h1>Estúdio Evydência <span class="live-badge"><span class="live-dot"></span> Ao Vivo</span></h1>
-      <p>Instância Ativa: <strong>evydencia (48 99642-5287)</strong> &bull; Tráfego Pago & Atendimento</p>
+<div class="shell">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Estúdio Evydência · Natal 2026</div>
+      <h1>Monitor de mensagens</h1>
+      <p class="description">Veja quem entrou pelo WhatsApp, como o bot respondeu e se a proposta chegou ao CRM.</p>
     </div>
-    <div class="header-actions">
-      <select id="autoRefreshSelect" class="dropdown" onchange="setupAutoRefresh()">
-        <option value="0">Auto-refresh: Desligado</option>
-        <option value="15" selected>Atualizar a cada 15s</option>
-        <option value="30">Atualizar a cada 30s</option>
-        <option value="60">Atualizar a cada 60s</option>
+    <div class="top-actions">
+      <select id="refreshInterval" class="select" aria-label="Atualização automática">
+        <option value="0">Atualização manual</option>
+        <option value="30" selected>Atualizar a cada 30 s</option>
+        <option value="60">Atualizar a cada 1 min</option>
+        <option value="120">Atualizar a cada 2 min</option>
       </select>
-      <button class="btn" onclick="fetchData()">🔄 Atualizar</button>
+      <button class="btn" id="refreshBtn" type="button">Atualizar agora</button>
     </div>
   </header>
 
-  <div class="metrics-grid">
-    <div class="metric-card">
-      <span class="metric-title">Total de Contatos</span>
-      <span class="metric-val" id="metricTotal">—</span>
-      <span class="metric-sub">Base registrada em disco</span>
-    </div>
-    <div class="metric-card">
-      <span class="metric-title">🎯 Tráfego Pago (Meta Ads)</span>
-      <span class="metric-val val-ads" id="metricAds">—</span>
-      <span class="metric-sub">Funil de Natal ativado</span>
-    </div>
-    <div class="metric-card">
-      <span class="metric-title">💬 Orgânico (Saudação)</span>
-      <span class="metric-val val-org" id="metricOrg">—</span>
-      <span class="metric-sub">Atendimento / Menu</span>
-    </div>
-    <div class="metric-card">
-      <span class="metric-title">📅 Propostas aceitas pelo CRM</span>
-      <span class="metric-val val-crm" id="metricCRM">—</span>
-      <span class="metric-sub">Agendamento registrado, entrega não comprovada</span>
-    </div>
-    <div class="metric-card">
-      <span class="metric-title">⏱️ Em Cooldown (24h)</span>
-      <span class="metric-val val-cooldown" id="metricCooldown">—</span>
-      <span class="metric-sub">Protegidos contra duplicação</span>
-    </div>
+  <div class="statusline" id="connectionLine" role="status" aria-live="polite">
+    <span id="statusText">Carregando histórico…</span>
+    <span class="minor" id="updatedAt">Dados registrados pelo bot; não é confirmação de entrega.</span>
   </div>
 
+  <div class="metrics" aria-label="Resumo dos registros carregados">
+    <div class="metric"><span class="heading">Mensagens recebidas</span><span class="value" id="kpiReceived">—</span><span class="detail">Na janela consultada</span></div>
+    <div class="metric"><span class="heading">Identificadas como anúncio</span><span class="value" id="kpiAds">—</span><span class="detail">Gatilho ou indicação Meta</span></div>
+    <div class="metric positive"><span class="heading">Propostas aceitas pelo CRM</span><span class="value" id="kpiAccepted">—</span><span class="detail">Agendadas, não entregues</span></div>
+    <div class="metric attention"><span class="heading">Precisam de atenção</span><span class="value" id="kpiAttention">—</span><span class="detail">Rejeitadas + incertas</span></div>
+  </div>
 
-  <section class="event-section" aria-label="Histórico detalhado do bot">
-    <h2>Histórico de mensagens e encaminhamentos</h2>
-    <p class="hint">Mensagens recebidas por ordem de ingresso, com gatilho e etapas de API. Resposta aceita pelo provedor não comprova entrega ou leitura no WhatsApp. Horários no fuso de Brasília.</p>
-    <div class="metrics-grid">
-      <div class="metric-card"><span class="metric-title">Recebidas (janela exibida)</span><span class="metric-val" id="eventReceived">—</span></div>
-      <div class="metric-card"><span class="metric-title">Meta Ads</span><span class="metric-val val-ads" id="eventAds">—</span></div>
-      <div class="metric-card"><span class="metric-title">CRM aceitou</span><span class="metric-val val-crm" id="eventAccepted">—</span></div>
-      <div class="metric-card"><span class="metric-title">CRM rejeitou</span><span class="metric-val event-failed" id="eventRejected">—</span></div>
-      <div class="metric-card"><span class="metric-title">Resultado incerto</span><span class="metric-val event-warning" id="eventUncertain">—</span></div>
+  <section class="section" aria-labelledby="historyHeading">
+    <div class="section-head">
+      <div>
+        <h2 id="historyHeading">Histórico de atendimentos</h2>
+        <p class="muted">Eventos mais recentes primeiro · fuso de Brasília · somente leitura</p>
+      </div>
     </div>
-    <div class="event-toolbar">
-      <select id="eventSource" onchange="renderEvents()" aria-label="Filtrar origem">
-        <option value="all">Todas as origens</option><option value="meta_ads">Meta Ads</option><option value="normal">Normal / sem anúncio comprovado</option>
+    <div class="tools">
+      <input id="searchEvents" class="search" type="search" aria-label="Pesquisar histórico" placeholder="Buscar nome, telefone ou mensagem">
+      <select id="filterSource" class="select" aria-label="Filtrar origem">
+        <option value="all">Todas as origens</option>
+        <option value="meta_ads">Tráfego pago identificado</option>
+        <option value="normal">Sem marcação de anúncio</option>
       </select>
-      <select id="eventStatus" onchange="renderEvents()" aria-label="Filtrar situação">
-        <option value="all">Todos os status</option><option value="crm_aceito">CRM aceitou</option><option value="crm_rejeitado">CRM rejeitou</option><option value="incerto">Incerto</option><option value="pendente">Pendente</option><option value="sem_tarefas">Sem execução registrada</option><option value="ignorado">Ignorado</option>
+      <select id="filterStatus" class="select" aria-label="Filtrar situação">
+        <option value="all">Todas as situações</option>
+        <option value="attention">Precisam de atenção</option>
+        <option value="crm_aceito">CRM aceitou</option>
+        <option value="crm_rejeitado">CRM rejeitou</option>
+        <option value="incerto">Resultado incerto</option>
+        <option value="pendente">Pendente</option>
+        <option value="sem_tarefas">Sem execução registrada</option>
+        <option value="finalizado_local">Atendimento local</option>
+        <option value="ignorado">Ignorados / bloqueados</option>
       </select>
-      <select id="eventLimit" onchange="fetchData()" aria-label="Quantidade de eventos">
-        <option value="50">Últimos 50</option><option value="150" selected>Últimos 150</option><option value="500">Últimos 500</option>
+      <select id="pageLimit" class="select" aria-label="Tamanho da janela">
+        <option value="50">50 mensagens</option>
+        <option value="150" selected>150 mensagens</option>
+        <option value="500">500 mensagens</option>
       </select>
-      <input type="search" id="eventSearch" placeholder="Buscar telefone, nome, texto ou gatilho" oninput="renderEvents()" aria-label="Busca no histórico">
     </div>
-    <div class="table-wrapper">
-      <table>
-        <thead><tr><th>Recebido (BRT)</th><th>Origem</th><th>Contato</th><th>Mensagem / gatilho</th><th>Decisão</th><th>APIs e respostas</th><th>Resultado</th></tr></thead>
-        <tbody id="eventsTableBody"><tr><td colspan="7" class="empty-state">Carregando histórico...</td></tr></tbody>
+    <div class="results" id="resultCount">Aguardando registros...</div>
+    <div class="scroll">
+      <table class="data-table" aria-label="Eventos recebidos pelo bot">
+        <colgroup><col style="width:15%"><col style="width:21%"><col style="width:29%"><col style="width:18%"><col style="width:17%"></colgroup>
+        <thead><tr><th>Recebido</th><th>Contato</th><th>Mensagem / gatilho</th><th>Resultado</th><th>Histórico de APIs</th></tr></thead>
+        <tbody id="eventRows"><tr><td colspan="5" class="empty">Carregando...</td></tr></tbody>
       </table>
     </div>
-    <p class="hint" style="margin-top:10px">O histórico anterior à atualização pode não ter texto, tipo ou origem disponíveis. O painel não efetua disparos nem tenta novamente tarefas incertas.</p>
+    <div class="hint">"CRM aceitou" significa que a proposta foi agendada. Não significa que o destinatário recebeu ou leu a mensagem. "Sem marcação de anúncio" não comprova origem orgânica. Histórico anterior pode estar incompleto.</div>
   </section>
-  <div class="controls-bar">
-    <div class="filter-tabs">
-      <button class="tab-btn active" onclick="setFilter('all', this)">Todos (<span id="countAll">0</span>)</button>
-      <button class="tab-btn" onclick="setFilter('ads', this)">🎯 Meta Ads (<span id="countAds">0</span>)</button>
-      <button class="tab-btn" onclick="setFilter('organic', this)">💬 Orgânico (<span id="countOrg">0</span>)</button>
-      <button class="tab-btn" onclick="setFilter('crm', this)">📅 Propostas CRM (<span id="countCRM">0</span>)</button>
-      <button class="tab-btn" onclick="setFilter('cooldown', this)">⏱️ Cooldown (<span id="countCooldown">0</span>)</button>
-    </div>
-    <div class="search-box">
-      <input type="text" id="searchInput" placeholder="Buscar por nome, telefone..." oninput="renderTable()">
-    </div>
-  </div>
 
-  <div class="table-wrapper">
-    <table>
-      <thead>
-        <tr>
-          <th>Data / Hora (BRT)</th>
-          <th>Lead / Contato</th>
-          <th>Telefone</th>
-          <th>Canal de Entrada</th>
-          <th>Campanha CRM 416</th>
-          <th>Última Etapa Executada</th>
-          <th>Status do Contato</th>
-        </tr>
-      </thead>
-      <tbody id="contactsTableBody">
-        <tr><td colspan="7" class="empty-state">Carregando contatos...</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <footer>
-    <span>Última sincronização: <strong id="lastSyncTime">—</strong></span>
-    <span>BotWhatsApp &bull; Histórico local &bull; CRM com API &bull; Evolution Go 0.7.2</span>
-  </footer>
+  <section class="section" aria-label="Resumo de contatos">
+    <details class="secondary-panel" id="contactsDetails">
+      <summary>Ver contatos agrupados por telefone (visão complementar)</summary>
+      <div class="secondary-body">
+        <p class="description">Esta visão agrupa várias mensagens do mesmo contato. Os totais podem ser diferentes dos eventos acima.</p>
+        <input id="searchContacts" class="search" type="search" placeholder="Buscar contato ou telefone" aria-label="Buscar contatos">
+        <div class="scroll">
+          <table class="contact-table"><thead><tr><th>Última atividade (BRT)</th><th>Nome</th><th>Telefone</th><th>Origem do fluxo</th><th>CRM</th></tr></thead>
+          <tbody id="contactRows"><tr><td colspan="5" class="empty">Abra para carregar os contatos.</td></tr></tbody></table>
+        </div>
+      </div>
+    </details>
+  </section>
+  <footer>Fonte: journal e outbox do BotWhatsApp · Sem disparos pelo painel · Acesso restrito.</footer>
 </div>
-
 <script>
-let currentContacts = [];
-let currentEvents = [];
-let activeFilter = 'all';
-let refreshTimer = null;
-
-function escapeHTML(value) {
-  return String(value == null ? "" : value).replace(/[&<>"\x27]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","\x27":"&#39;"}[ch]));
+'use strict';
+const state = { events:[], contacts:[], contactsLoaded:false, loading:false, timer:null, lastSuccess:null };
+const $ = id => document.getElementById(id);
+function safe(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, ch =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
-
-function getInitials(name) {
-  if (!name || name === "Cliente WhatsApp") return "📱";
-  const parts = name.trim().split(" ");
-  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+function badge(label, kind) { return '<span class="pill '+kind+'">'+safe(label)+'</span>'; }
+const statusLabels = {
+  crm_aceito:['CRM aceitou','success'], crm_rejeitado:['CRM rejeitou','danger'],
+  incerto:['Resultado incerto','danger'], pendente:['Pendente','warning'],
+  em_processamento:['Em andamento','warning'], sem_tarefas:['Sem execução registrada','neutral'],
+  finalizado_local:['Atendimento local finalizado','neutral'], ignorado:['Ignorado','neutral'],
+  opt_out:['Contato pediu para parar','warning'], recebido:['Recebido','neutral']
+};
+function showStatus(msg, error) {
+  $('connectionLine').classList.toggle('error', Boolean(error));
+  $('statusText').textContent=msg;
+  $('updatedAt').textContent=state.lastSuccess ? 'Última leitura: '+state.lastSuccess+' (BRT)' : 'Fonte: registros locais do bot.';
 }
-
-function setFilter(filter, el) {
-  activeFilter = filter;
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  if (el) el.classList.add('active');
-  renderTable();
+function stepsHTML(steps) {
+  if (!Array.isArray(steps) || !steps.length) return '<span class="plain-note">Nenhuma etapa de API registrada</span>';
+  return '<details class="steps"><summary>Ver '+steps.length+' etapa(s)</summary><ol class="timeline">'+
+    steps.map(t => '<li><strong>'+safe(t.step)+'</strong>'+
+      '<div>'+safe(t.provider)+' · <span class="resp">'+safe(t.api_response)+'</span></div>'+
+      (t.started_brt ? '<div class="sub">Início: '+safe(t.started_brt)+'</div>' : '')+
+      (t.completed_brt ? '<div class="sub">Fim: '+safe(t.completed_brt)+'</div>' : '')+
+      (t.external_id ? '<div class="sub">Recibo: '+safe(t.external_id)+'</div>' : '')+
+      (t.reason ? '<div class="sub">Motivo: '+safe(t.reason)+'</div>' : '')+'</li>').join('')+
+      '</ol></details>';
 }
-
-async function fetchData() {
-  try {
-    const res = await fetch('/api/dashboard/contacts', {credentials: 'same-origin'});
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    currentContacts = data.contacts || [];
-    
-    // Update stats cards
-    document.getElementById('metricTotal').textContent = data.stats.total_contacts || 0;
-    document.getElementById('metricAds').textContent = data.stats.ads_contacts || 0;
-    document.getElementById('metricOrg').textContent = data.stats.organic_contacts || 0;
-    document.getElementById('metricCRM').textContent = data.stats.crm_scheduled || 0;
-    document.getElementById('metricCooldown').textContent = data.stats.active_cooldown || 0;
-    document.getElementById('lastSyncTime').textContent = data.stats.generated_at_brt || 'Agora';
-
-    // Update tab counts
-    document.getElementById('countAll').textContent = currentContacts.length;
-    document.getElementById('countAds').textContent = currentContacts.filter(c => c.is_ads).length;
-    document.getElementById('countOrg').textContent = currentContacts.filter(c => !c.is_ads).length;
-    document.getElementById('countCRM').textContent = currentContacts.filter(c => c.crm_schedule_id).length;
-    document.getElementById('countCooldown').textContent = currentContacts.filter(c => c.cooldown_active).length;
-
-    renderTable();
-  } catch (err) {
-    console.error('Falha ao buscar contatos:', err);
-  }
-  try {
-    const count = document.getElementById('eventLimit').value;
-    const resp = await fetch('/api/dashboard/events?limit=' + encodeURIComponent(count), {credentials:'same-origin'});
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const history = await resp.json();
-    currentEvents = history.events || [];
-    const st = history.stats || {};
-    document.getElementById('eventReceived').textContent = st.received || 0;
-    document.getElementById('eventAds').textContent = st.meta_ads || 0;
-    document.getElementById('eventAccepted').textContent = st.crm_accepted || 0;
-    document.getElementById('eventRejected').textContent = st.crm_rejected || 0;
-    document.getElementById('eventUncertain').textContent = st.uncertain || 0;
-    renderEvents();
-  } catch (err) {
-    document.getElementById('eventsTableBody').innerHTML = '<tr><td colspan="7" class="empty-state">Histórico indisponível. Verifique o endpoint protegido /api/dashboard/events.</td></tr>';
-    console.error('Falha ao buscar histórico:', err);
-  }
-}
-
-function renderTable() {
-  const query = (document.getElementById('searchInput').value || '').toLowerCase().trim();
-  const tbody = document.getElementById('contactsTableBody');
-  
-  const filtered = currentContacts.filter(c => {
-    // Filter by tab
-    if (activeFilter === 'ads' && !c.is_ads) return false;
-    if (activeFilter === 'organic' && c.is_ads) return false;
-    if (activeFilter === 'crm' && !c.crm_schedule_id) return false;
-    if (activeFilter === 'cooldown' && !c.cooldown_active) return false;
-
-    // Search query
-    if (query) {
-      const matchName = (c.name || '').toLowerCase().includes(query);
-      const matchPhone = (c.phone_raw || '').includes(query) || (c.phone_formatted || '').includes(query);
-      const matchStep = (c.last_step || '').toLowerCase().includes(query);
-      const matchCRM = (c.crm_schedule_id || '').toLowerCase().includes(query);
-      return matchName || matchPhone || matchStep || matchCRM;
-    }
-    return true;
-  });
-
-  if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Nenhum contato encontrado para este filtro.</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = filtered.map(c => {
-    const avatarClass = c.is_ads ? 'ads' : 'org';
-    const channelBadge = c.is_ads 
-      ? '<span class="badge badge-ads">🎯 Meta Ads</span>' 
-      : '<span class="badge badge-org">💬 Orgânico</span>';
-    
-    let crmBadge = '<span class="badge badge-crm-none">—</span>';
-    if (c.crm_schedule_id) {
-      crmBadge = '<span class="badge badge-crm-done">✅ Aceito no CRM (' + escapeHTML(c.crm_schedule_id) + ')</span>';
-    } else if (c.is_ads && (c.crm_status === "Incerto / revisar" || c.crm_status === "Rejeitado / não agendado")) {
-      crmBadge = '<span class="badge badge-cooldown">⚠️ ' + escapeHTML(c.crm_status) + '</span>';
-    } else if (c.is_ads && c.crm_status === "Pendente") {
-      crmBadge = '<span class="badge badge-cooldown">⏳ Pendente</span>';
-    }
-
-    let statusBadges = [];
-    if (c.opt_out) {
-      statusBadges.push('<span class="badge badge-optout">🔴 Parar / Opt-Out</span>');
-    } else if (c.human_paused) {
-      statusBadges.push('<span class="badge badge-cooldown">⏸️ Pausa Humana</span>');
-    } else if (c.cooldown_active) {
-      statusBadges.push('<span class="badge badge-cooldown">⏱️ Cooldown (' + (c.cooldown_remaining || '24h') + ')</span>');
-    } else {
-      statusBadges.push('<span class="badge badge-crm-done">🟢 Ativo</span>');
-    }
-
-    return '<tr>' +
-      '<td class="time-col">' + (c.last_interaction_brt || '—') + '</td>' +
-      '<td>' +
-        '<div class="lead-info">' +
-          '<div class="avatar ' + avatarClass + '">' + escapeHTML(getInitials(c.name)) + '</div>' +
-          '<div class="lead-name">' + escapeHTML(c.name || 'Cliente WhatsApp') + '</div>' +
-        '</div>' +
-      '</td>' +
-      '<td><strong>' + escapeHTML(c.phone_formatted) + '</strong></td>' +
-      '<td>' + channelBadge + '</td>' +
-      '<td>' + crmBadge + '</td>' +
-      '<td>' + escapeHTML(c.last_step) + '</td>' +
-      '<td>' + statusBadges.join(' ') + '</td>' +
-    '</tr>';
-  }).join('');
-}
-
 function renderEvents() {
-  const src = document.getElementById('eventSource').value;
-  const status = document.getElementById('eventStatus').value;
-  const q = document.getElementById('eventSearch').value.toLocaleLowerCase('pt-BR').trim();
-  const tbody = document.getElementById('eventsTableBody');
-  const labels = {
-    crm_aceito:'CRM aceitou', crm_rejeitado:'CRM rejeitou', incerto:'Incerto / investigar',
-    pendente:'Pendente', ignorado:'Ignorado', opt_out:'Opt-out',
-    recebido:'Recebido', sem_tarefas:'Sem execução registrada', finalizado_local:'Fluxo local finalizado', em_processamento:'Em andamento'
-  };
-  const rows = currentEvents.filter(e => {
-    if (src !== 'all' && e.source !== src) return false;
-    if (status !== 'all' && e.status !== status) return false;
-    if (!q) return true;
-    return [e.phone,e.name,e.inbound_text,e.trigger_text,e.decision,e.crm_receipt]
-      .some(v => String(v || '').toLocaleLowerCase('pt-BR').includes(q));
+  const source=$('filterSource').value, filter=$('filterStatus').value;
+  const term=$('searchEvents').value.trim().toLocaleLowerCase('pt-BR');
+  const found=state.events.filter(e => {
+    if (source!=='all' && source!==e.source) return false;
+    if (filter==='attention' && e.status!=='crm_rejeitado' && e.status!=='incerto') return false;
+    if (filter==='ignorado' && e.status!=='ignorado' && e.status!=='opt_out') return false;
+    if (filter!=='all' && filter!=='attention' && filter!=='ignorado' && filter!==e.status) return false;
+    return !term || [e.name,e.phone,e.inbound_text,e.trigger_text,e.crm_receipt,e.decision_reason]
+      .some(t => String(t||'').toLocaleLowerCase('pt-BR').includes(term));
   });
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Nenhum evento encontrado nos registros carregados.</td></tr>';
+  $('resultCount').textContent='Exibindo '+found.length+' de '+state.events.length+' mensagens carregadas (filtros apenas nesta janela)';
+  if (!found.length) {
+    $('eventRows').innerHTML='<tr><td colspan="5" class="empty">Nenhum registro encontrado nesta janela. Ajuste os filtros ou carregue mais mensagens.</td></tr>';
     return;
   }
-  tbody.innerHTML = rows.map(e => {
-    const isAds = e.source === 'meta_ads';
-    const sourceBadge = isAds
-      ? '<span class="badge badge-ads">Meta Ads</span>'
-      : '<span class="badge badge-org">Normal</span>';
-    const text = escapeHTML(e.inbound_text || '(sem texto salvo)');
-    const trig = e.trigger_matched
-      ? '<div class="event-mini event-success">Gatilho exato: ' + escapeHTML(e.trigger_text || '(legado)') + '</div>'
-      : '<div class="event-mini">Sem gatilho exato' + (e.has_ad_context ? ' · origem anúncio identificada' : '') + '</div>';
-    const steps = Array.isArray(e.steps) ? e.steps : [];
-    const details = steps.length
-      ? '<details class="event-steps"><summary>' + steps.length + ' etapa(s) — conferir recibos</summary><ul>' +
-        steps.map(t => '<li><strong>' + escapeHTML(t.step) + '</strong> · ' +
-        escapeHTML(t.provider) + ' · ' + escapeHTML(t.api_response) +
-        (t.started_brt ? ' · iniciou ' + escapeHTML(t.started_brt) : '') +
-        (t.completed_brt ? ' · terminou ' + escapeHTML(t.completed_brt) : '') +
-        (t.external_id ? ' · recibo ' + escapeHTML(t.external_id) : '') +
-        (t.reason ? ' · ' + escapeHTML(t.reason) : '') +
-        '</li>').join('') + '</ul></details>'
-      : '<span class="event-mini">Nenhuma etapa automática registrada</span>';
-    let statusClass = 'event-warning';
-    if (e.status === 'crm_aceito') statusClass = 'event-success';
-    if (e.status === 'crm_rejeitado' || e.status === 'incerto') statusClass = 'event-failed';
-    return '<tr><td class="time-col">' + escapeHTML(e.received_at_brt) + '</td>' +
-      '<td>' + sourceBadge + '</td>' +
-      '<td><strong>' + escapeHTML(e.name) + '</strong><div class="event-mini">' + escapeHTML(e.phone) + '</div></td>' +
-      '<td class="event-text">' + text + '<div class="event-mini">Tipo: ' + escapeHTML(e.inbound_type) + '</div>' + trig + '</td>' +
-      '<td>' + escapeHTML(e.decision) +
-        (e.decision_reason ? '<div class="event-mini">' + escapeHTML(e.decision_reason) + '</div>' : '') + '</td>' +
-      '<td>' + details + '</td>' +
-      '<td><span class="event-state ' + statusClass + '">' + escapeHTML(labels[e.status] || e.status) + '</span>' +
-      (e.crm_receipt ? '<div class="event-mini">Despacho: ' + escapeHTML(e.crm_receipt) + '</div>' : '') + '</td></tr>';
+  $('eventRows').innerHTML=found.map(e => {
+    const label=statusLabels[e.status] || ['Estado não identificado','neutral'];
+    const sourceTag=e.source==='meta_ads' ? badge('Anúncio identificado','ads') : badge('Sem marcação de anúncio','normal');
+    const message=safe(e.inbound_text || '(texto não registrado)');
+    const trigger=e.trigger_matched ?
+      '<div class="trigger">Gatilho reconhecido'+(e.trigger_text ? ': '+safe(e.trigger_text) : '')+'</div>' :
+      '<div class="sub">Sem gatilho exato'+(e.has_ad_context ? ' · contexto Meta presente' : '')+'</div>';
+    return '<tr>'+
+      '<td data-label="Recebido"><div class="date">'+safe(e.received_at_brt || 'Data indisponível')+'</div></td>'+
+      '<td data-label="Contato"><div class="cell-main">'+safe(e.name || 'Contato WhatsApp')+'</div>'+
+        '<div class="sub">'+safe(e.phone || 'Telefone não identificado')+'</div><div style="margin-top:7px">'+sourceTag+'</div></td>'+
+      '<td data-label="Mensagem / gatilho"><div class="message">'+message+'</div>'+
+        '<div class="sub">Tipo: '+safe(e.inbound_type || 'Não informado')+'</div>'+trigger+'</td>'+
+      '<td data-label="Resultado">'+badge(label[0],label[1])+
+        (e.crm_receipt ? '<div class="sub">Despacho: '+safe(e.crm_receipt)+'</div>' : '')+
+        (e.decision_reason ? '<div class="sub">'+safe(e.decision_reason)+'</div>' : '')+'</td>'+
+      '<td data-label="Histórico das APIs">'+stepsHTML(e.steps)+'</td></tr>';
   }).join('');
 }
-
-function setupAutoRefresh() {
-  if (refreshTimer) clearInterval(refreshTimer);
-  const val = parseInt(document.getElementById('autoRefreshSelect').value, 10);
-  if (val > 0) {
-    refreshTimer = setInterval(fetchData, val * 1000);
+function renderContacts(){
+  const term=$('searchContacts').value.trim().toLocaleLowerCase('pt-BR');
+  const found=state.contacts.filter(c=>!term||[c.name,c.phone_raw,c.phone_formatted]
+    .some(x=>String(x||'').toLocaleLowerCase('pt-BR').includes(term)));
+  $('contactRows').innerHTML=found.length ? found.map(c=>
+    '<tr><td>'+safe(c.last_interaction_brt)+'</td>'+
+    '<td><strong>'+safe(c.name)+'</strong></td>'+
+    '<td>'+safe(c.phone_formatted)+'</td>'+
+    '<td>'+safe(c.channel)+'</td>'+
+    '<td>'+safe(c.crm_status)+'</td></tr>').join('') :
+    '<tr><td colspan="5" class="empty">Nenhum contato encontrado.</td></tr>';
+}
+async function loadContacts(){
+  if (state.contactsLoaded) return;
+  try {
+    const res=await fetch('/api/dashboard/contacts',{credentials:'same-origin',cache:'no-store'});
+    if(!res.ok) throw new Error('Falha HTTP '+res.status);
+    const data=await res.json();
+    state.contacts=Array.isArray(data.contacts)?data.contacts:[];
+    state.contactsLoaded=true;
+    renderContacts();
+  } catch (_) {
+    $('contactRows').innerHTML='<tr><td colspan="5" class="empty">Contatos indisponíveis. Tente fechar e abrir esta seção.</td></tr>';
   }
 }
-
-// Initial fetch and start auto-refresh
-fetchData();
-setupAutoRefresh();
+async function refreshData(){
+  if(state.loading) return;
+  state.loading=true;
+  $('refreshBtn').disabled=true;
+  showStatus('Consultando histórico do bot...',false);
+  try {
+    const res=await fetch('/api/dashboard/events?limit='+encodeURIComponent($('pageLimit').value),
+      {credentials:'same-origin',cache:'no-store'});
+    if(!res.ok) throw new Error('Falha HTTP '+res.status);
+    const data=await res.json();
+    if(!Array.isArray(data.events) || !data.stats) throw new Error('Formato inesperado');
+    state.events=data.events;
+    $('kpiReceived').textContent=data.stats.received||0;
+    $('kpiAds').textContent=data.stats.meta_ads||0;
+    $('kpiAccepted').textContent=data.stats.crm_accepted||0;
+    $('kpiAttention').textContent=(data.stats.crm_rejected||0)+(data.stats.uncertain||0);
+    state.lastSuccess=new Date().toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',hour12:false});
+    showStatus('Histórico consultado com sucesso.',false);
+    renderEvents();
+    // Contacts are only read when the manager expands the optional section.
+    if($('contactsDetails').open && state.contactsLoaded){
+      state.contactsLoaded=false;
+      await loadContacts();
+    }
+  } catch(_){
+    showStatus('Não foi possível atualizar. Os dados anteriores continuam na tela.',true);
+    if(!state.lastSuccess) $('eventRows').innerHTML='<tr><td colspan="5" class="empty">Histórico indisponível. Verifique o acesso ao bot.</td></tr>';
+  } finally {
+    state.loading=false;
+    $('refreshBtn').disabled=false;
+  }
+}
+function configureTimer(){
+  if(state.timer) clearInterval(state.timer);
+  const seconds=Number($('refreshInterval').value);
+  if(seconds>0) state.timer=setInterval(()=>{
+    if(!document.hidden) refreshData();
+  },seconds*1000);
+}
+$('refreshBtn').addEventListener('click',refreshData);
+$('refreshInterval').addEventListener('change',configureTimer);
+$('pageLimit').addEventListener('change',refreshData);
+['searchEvents','filterSource','filterStatus'].forEach(id=>{
+  $(id).addEventListener(id==='searchEvents'?'input':'change',renderEvents);
+});
+$('contactsDetails').addEventListener('toggle',()=>{
+  if($('contactsDetails').open) loadContacts();
+});
+$('searchContacts').addEventListener('input',renderContacts);
+configureTimer();
+refreshData();
 </script>
 </body>
-</html>
-`
+</html>`
