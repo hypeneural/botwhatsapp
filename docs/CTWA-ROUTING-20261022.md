@@ -1,5 +1,8 @@
 # Fluxo Meta Ads e saudações — contrato do bot em 23/10/2026
 
+> **HISTÓRICO ATÉ 23/10, NÃO É PLANO DE DEPLOY.** O número atual é o 5287; o CRM bloqueou a API genérica de 415/416, de modo que as instruções de agendamento genérico abaixo são inválidas para produção. O código da PR #10 integra a API nativa e o painel responsivo. Consultar [CTWA-NATIVE-HANDOFF-20261027.md](CTWA-NATIVE-HANDOFF-20261027.md) e [PAINEL-GESTOR-CTWA-20261027.md](PAINEL-GESTOR-CTWA-20261027.md).
+
+
 ## Evidência do anúncio inspecionado
 O relatório read-only do Antigravity informa que a instância GO `anderson`, conectada originalmente ao **48 3220-0440**, recebeu contato pelo Reel/CTWA Instagram. Há dois textos completos comprovados no criativo: **"Quero conhecer os pacotes do Primeiro Natal em Tijucas"** (reel) e **"Quero conhecer os pacotes de Natal em Tijucas"** (imagem/carrossel), no campo `data.Message.extendedTextMessage.text`. O campo `Chat` traz JID telefônico `@s.whatsapp.net`; `SenderAlt` é `@lid`. `externalAdReply` e `referral` indicam a origem do anúncio, mas são metadados contextuais e NÃO são evidência criptográfica nem gatilho sozinho.
 
