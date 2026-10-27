@@ -80,6 +80,27 @@ func TestDashboardExactLIDMappingAndAmbiguity(t *testing.T) {
 	}
 }
 
+func TestDashboardLIDSenderAltSwapMapsOnlyByExplicitAlias(t *testing.T) {
+	dir := t.TempDir()
+	lid := "777777@lid"
+	phone := "5548999990001"
+	now := time.Now().UTC()
+	writeIdentityFixture(t, dir, strings.Repeat("e",64), core.Decision{
+		Action:core.Ignore, InstanceID:"ads", MessageID:"e",
+		ReplyJID:lid, LIDAlias:lid, Reason:"unresolved_phone_or_non_private_chat",
+	}, now)
+	writeIdentityFixture(t, dir, strings.Repeat("f",64), core.Decision{
+		Action:core.Ignore, InstanceID:"ads", MessageID:"f",
+		ReplyJID:phone+"@s.whatsapp.net", LIDAlias:lid,
+		PhoneE164:phone, Name:"Contato declarado",
+	}, now.Add(-time.Minute))
+	got,err := NewService(dir).GetEvents(10)
+	if err != nil {t.Fatal(err)}
+	for _,row := range got.Events {
+		if row.phoneE164!=phone {t.Fatalf("explicit senderAlt pair not applied: %+v",row)}
+	}
+}
+
 func TestDashboardCRMNameCacheIsBoundToVerifiedPhone(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.Mkdir(filepath.Join(dir,"contacts"),0700); err != nil {t.Fatal(err)}
