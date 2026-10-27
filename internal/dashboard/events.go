@@ -332,6 +332,14 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 			result.Stats.Uncertain++
 		}
 	}
+	// Journal file mtime can change during backup/restore. Display by the
+	// actual persisted reception timestamp, with a deterministic tie-breaker.
+	sort.Slice(result.Events, func(i, j int) bool {
+		if result.Events[i].ReceivedAt.Equal(result.Events[j].ReceivedAt) {
+			return result.Events[i].EventKey > result.Events[j].EventKey
+		}
+		return result.Events[i].ReceivedAt.After(result.Events[j].ReceivedAt)
+	})
 	return result, nil
 }
 
