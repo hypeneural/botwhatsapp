@@ -54,7 +54,7 @@ func TestWebhookPreviewDurableAndIdempotent(t *testing.T) {
 		Decision core.Decision `json:"decision"`
 		Status   string        `json:"status"`
 	}
-	if err := json.Unmarshal(buf, &rec); err != nil || rec.Decision.Action != core.AdsProposal || rec.Status != "planned_preview_only" {
+	if err := json.Unmarshal(buf, &rec); err != nil || rec.Decision.Action != core.AdsProposal || rec.Status != "received" {
 		t.Fatal(err, rec)
 	}
 	wrong := httptest.NewRecorder()
