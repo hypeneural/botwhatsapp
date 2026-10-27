@@ -1,5 +1,6 @@
 # Release controlado — BotWhatsApp CTWA 5287 → CRM Natal V4
 
+> **ATUALIZAÇÃO P0:** sequência operacional do Antigravity condensada em [CTWA-P0-EXECUCAO-AI-FIRST.md](CTWA-P0-EXECUCAO-AI-FIRST.md). Provisionador seguro scripts/configure-ctwa-secrets.py; emissor/verificador Sanctum somente no host CRM real; teste focal scripts/validate-ctwa-p0-credentials.sh. O pré-flight confere apenas configuração/formato, não autenticação real. Nenhum token vai para chat/Git. O bloco operacional abaixo é histórico até reconferência dos paths do Compose e volume efetivo.\n\n
 **Data:** 27/10/2026 · **Repositório:** `hypeneural/botwhatsapp` · **PR:** #10  
 **Escopo autorizado para esta documentação:** preparar e validar o código, executar diagnóstico somente leitura e orientar um canário restrito. **Não autoriza alterar o CRM, Evolution, Status Engine ou dados históricos.**
 
