@@ -322,8 +322,8 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 		}
 		step := EventStep{
 			startedAt: t.AttemptStartedAt,
-			TaskID: t.ID,
-			Step:   FriendlyStep(string(t.Step)), Provider: "Evolution Go",
+			TaskID:    t.ID,
+			Step:      FriendlyStep(string(t.Step)), Provider: "Evolution Go",
 			State: string(t.State), APIResponse: outcome(t),
 			ExternalID: t.ExternalID, Reason: safeEventReason(t.Error),
 			StartedBRT:   formatEventBRT(t.AttemptStartedAt),

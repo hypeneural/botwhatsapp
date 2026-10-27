@@ -88,7 +88,7 @@ def run(base, token, panel_only=False):
     html = body.decode("utf-8", errors="replace") if code == 200 else ""
     check("dashboard com Basic Auth HTTP 200 e HTML", code == 200 and "text/html" in ct and "<html" in html.lower())
     check("URLs absolutas same-origin no JS servido",
-          "new URL(path, window.location.origin)" in html and "credentials:'same-origin'" in html)
+          "new URL(path, window.location.origin)" in html and ("credentials:'same-origin'" in html or "credentials: 'same-origin'" in html))
     code, _, _ = request_read(opener, base, "/dashboard", token, method="HEAD")
     check("dashboard HEAD autenticado", code == 200)
     code, ct, body = request_read(opener, base, "/api/dashboard/events?limit=10", token)

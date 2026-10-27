@@ -643,7 +643,7 @@ function renderContacts() {
 async function loadContacts() {
   if (state.contactsLoaded) return;
   try {
-    const res = await fetch(apiURL('/api/dashboard/contacts'), { credentials: 'same-origin', cache: 'no-store' });
+    const res = await fetch(apiURL('/api/dashboard/contacts'), { credentials:'same-origin', cache: 'no-store' });
     if (!res.ok) throw new Error('Falha HTTP ' + res.status);
     const data = await res.json();
     state.contacts = Array.isArray(data.contacts) ? data.contacts : [];
@@ -661,7 +661,7 @@ async function refreshData() {
   showStatus('Consultando histórico do bot...', false);
   try {
     const res = await fetch(apiURL('/api/dashboard/events?limit=' + encodeURIComponent($('pageLimit').value)),
-      { credentials: 'same-origin', cache: 'no-store' });
+      { credentials:'same-origin', cache: 'no-store' });
     if (!res.ok) throw new Error('Falha HTTP ' + res.status);
     const data = await res.json();
     if (!Array.isArray(data.events) || !data.stats) throw new Error('Formato inesperado');
