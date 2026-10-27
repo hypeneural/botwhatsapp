@@ -43,6 +43,13 @@ func TestOperationalEventTimelineJoinsOutbox(t *testing.T) {
 	if e.Steps[0].APIResponse!="API aceitou (entrega não comprovada)" ||
 	   e.Steps[1].Reason!="HTTP 422: rejeição do contrato/regra comercial" {t.Fatalf("wrong step responses %+v",e.Steps)}
 	if result.Stats.CRMRejected!=1||result.Stats.MetaAds!=1||result.Stats.Received!=1 {t.Fatalf("wrong stats %+v",result.Stats)}
+	// The snapshot cache must not leak mutable slices across requests.
+	result.Events[0].Name="MUTATED"
+	result.Events[0].Steps[0].Step="MUTATED"
+	next,err:=svc.GetEvents(5)
+	if err!=nil || next.Events[0].Name=="MUTATED" || next.Events[0].Steps[0].Step=="MUTATED" {
+		t.Fatal("event cache returned shared mutable slices",err)
+	}
 	if safeEventReason("https://example.com/?token=VERY_PRIVATE_SECRET")=="https://example.com/?token=VERY_PRIVATE_SECRET" {t.Fatal("raw provider errors leaked")}
 }
 
