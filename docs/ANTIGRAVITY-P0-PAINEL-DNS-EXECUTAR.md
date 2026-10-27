@@ -50,9 +50,9 @@ python3 scripts/audit-ctwa-panel-readonly.py --env /srv/platform/stacks/botwhats
 ```
 No hostname público apenas APÓS checar DNS e TLS real:
 ```bash
-python3 scripts/audit-ctwa-panel-readonly.py --env /srv/platform/stacks/botwhatsapp/.env.production --base-url https://bot.etijucas.com.br
+python3 scripts/audit-ctwa-panel-readonly.py --env /srv/platform/stacks/botwhatsapp/.env.production --base-url https://bot.etijucas.com.br --panel-only
 ```
-Deve confirmar healthz/readyz no localhost, painel e API eventos/contatos com JSON legível, 401 anônimo, URL absoluta JS. **Nota:** o template Caddy isola healthz/readyz e o script HTTP externo exige esses caminhos: testar o domínio com chamadas curl sem autenticação aos caminhos expostos, ou ampliar o script para aceitar --panel-only quando em ambiente externo, sem expor healthz desnecessariamente. Não considerar 404 healthz no hostname como falha de privacidade; confirmar no localhost.
+Deve confirmar healthz/readyz no localhost, painel e API eventos/contatos com JSON legível, 401 anônimo, URL absoluta JS. **Nota:** o template Caddy isola healthz/readyz; por isso a verificação HTTPS externa usa --panel-only. O localhost deve continuar passando em /healthz e /readyz. Nunca expor healthz/readyz só para passar um teste.
 
 Validar UI no Chrome desktop e 390 px usando HTTPS final, sem CORS, sem rolagem horizontal e com nome/telefone representando evidências reais. CRM como fonte prevalente de nome; WhatsApp PushName deve ser identificado como auto declarado; LID sem prova deve ser "Número oculto pelo WhatsApp (LID)". Testar nomes em tabela de eventos e na aba de contatos. Não mostrar nomes ou telefones reais no relatório.
 
