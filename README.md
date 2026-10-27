@@ -4,7 +4,7 @@
 
 Serviço Go independente para dois workflows do WhatsApp no Estúdio Evidência, integrado à **Evolution Go 0.7.2 instalada** e à **API existente do Evidência CRM**. O número conectado aos anúncios recebe primeiro tratamento CTWA configurável, com saudação genérica se a frase não corresponder. Não modificar o código, banco ou infraestrutura do CRM.
 
-**Painel do gestor (PR #10):** [guia do painel e prévia local](docs/PAINEL-GESTOR-CTWA-20261027.md). Histórico de mensagens, origem com grau de evidência, contadores de atenção e timeline das APIs. O script local `scripts/validate-ctwa-handoff-local.ps1 -Format -Preview` faz testes e abre dados fictícios sem tocar nas APIs comerciais.
+**Release CTWA 5287:** [gates operacionais, preflight somente leitura, volume persistente e canário único](docs/RELEASE-BOT-CTWA-5287-20261027.md). Não utilizar o Compose staging na VPS para substituir o serviço real.\n\n**Painel do gestor (PR #10):** [guia do painel e prévia local](docs/PAINEL-GESTOR-CTWA-20261027.md). Histórico de mensagens, origem com grau de evidência, contadores de atenção e timeline das APIs. O script local `scripts/validate-ctwa-handoff-local.ps1 -Format -Preview` faz testes e abre dados fictícios sem tocar nas APIs comerciais.
 
 ## Estado em 22/10/2026
 
