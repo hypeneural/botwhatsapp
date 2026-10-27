@@ -36,7 +36,11 @@ func auditInbound(body []byte, decision core.Decision) InboundAudit {
 				Audio json.RawMessage `json:"audioMessage"`
 				Document json.RawMessage `json:"documentMessage"`
 				Buttons json.RawMessage `json:"buttonsResponseMessage"`
+				ContextInfo struct {
+					ExternalAdReply json.RawMessage `json:"externalAdReply"`
+				} `json:"contextInfo"`
 			} `json:"Message"`
+			Referral json.RawMessage `json:"referral"`
 		} `json:"data"`
 	}
 	_ = json.Unmarshal(body, &e)
@@ -58,8 +62,8 @@ func auditInbound(body []byte, decision core.Decision) InboundAudit {
 	case len(m.Buttons) > 0:
 		a.MessageType = "botao"
 	}
-	a.HasAdContext = len(m.Extended.ContextInfo.ExternalAdReply) > 0 &&
-		string(m.Extended.ContextInfo.ExternalAdReply) != "null"
+	a.HasAdContext = hasMetadata(m.Extended.ContextInfo.ExternalAdReply) ||
+		hasMetadata(m.ContextInfo.ExternalAdReply) || isAdReferral(e.Data.Referral)
 	a.TriggerMatch = decision.Action == core.AdsProposal
 	if a.TriggerMatch {
 		a.TriggerText = a.Text
@@ -89,4 +93,26 @@ func auditExcerpt(s string) string {
 		runes++
 	}
 	return b.String()
+}
+
+func hasMetadata(raw json.RawMessage) bool {
+	value := strings.TrimSpace(string(raw))
+	return value != "" && value != "null" && value != "{}"
+}
+
+// Evolution Go may put Meta referral alongside data.Message rather than inside
+// extendedTextMessage.contextInfo. Only sourceType=ad is considered a hint.
+func isAdReferral(raw json.RawMessage) bool {
+	if !hasMetadata(raw) {
+		return false
+	}
+	var meta struct {
+		SourceType string `json:"sourceType"`
+		SourceTypeAlt string `json:"source_type"`
+	}
+	if json.Unmarshal(raw, &meta) != nil {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(meta.SourceType), "ad") ||
+		strings.EqualFold(strings.TrimSpace(meta.SourceTypeAlt), "ad")
 }
