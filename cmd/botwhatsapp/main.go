@@ -149,10 +149,6 @@ func main() {
 		if err != nil {
 			log.Fatal("cannot initialize durable outbox: ", err)
 		}
-		var crmInstanceID *int
-		if id, err := strconv.Atoi(os.Getenv("EVIDENCIA_CRM_OUTBOUND_MESSAGE_INSTANCE_ID")); err == nil && id > 0 {
-			crmInstanceID = &id
-		}
 		nativeToken := strings.TrimSpace(os.Getenv("EVIDENCIA_CRM_PROPOSAL_SANCTUM_TOKEN"))
 		if adsUUID != "" && nativeToken == "" {
 			log.Fatal("ads proposal requires EVIDENCIA_CRM_PROPOSAL_SANCTUM_TOKEN (native CRM endpoint); legacy campaign 416 is blocked")
@@ -163,10 +159,6 @@ func main() {
 			log.Fatal("America/Sao_Paulo timezone is required for shared CRM claim")
 		}
 		
-		crmClient := crm.Client{
-			BaseURL:       env("EVIDENCIA_CRM_BASE_URL", "https://evydencia.com"),
-			Authorization: os.Getenv("EVIDENCIA_CRM_AUTHORIZATION"),
-		}
 		audio := readAsset("BOT_ADS_AUDIO_FILE")
 		image := readAsset("BOT_GREETING_IMAGE_FILE")
 		adImage := readAsset("BOT_ADS_IMAGE_FILE")
@@ -213,7 +205,6 @@ func main() {
 		}
 		cfg := outbox.Config{
 			DataDir: dataDir, GreetingCooldown: 24 * time.Hour, AdsFlowCooldown: time.Duration(adsCooldownHours) * time.Hour,
-			CRMInstanceID:            crmInstanceID,
 			OperationalAuthorization: opAuth,
 			NativeProposalScheduler: crm.NativeClient{BaseURL: env("EVIDENCIA_CRM_BASE_URL", "https://evydencia.com"), BearerToken: nativeToken},
 			AdReactionEmoji:          env("BOT_ADS_REACTION_EMOJI", "🎄"),
@@ -258,7 +249,7 @@ func main() {
 			}
 			cfg.GreetingCaption = string(raw)
 		}
-		worker, err = outbox.NewWorker(cfg, store, nil, crmClient)
+		worker, err = outbox.NewWorker(cfg, store, nil, nil)
 		if err != nil {
 			log.Fatal("outbox worker init: ", err)
 		}
