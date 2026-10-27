@@ -193,7 +193,9 @@ func (s *Service) buildRow(c outbox.ContactState, tasks []outbox.Task, now time.
 
 	// Sort tasks by CreatedAt ascending
 	sort.Slice(tasks, func(i, j int) bool {
-		if tasks[i].CreatedAt.Equal(tasks[j].CreatedAt) { return tasks[i].ID < tasks[j].ID }
+		if tasks[i].CreatedAt.Equal(tasks[j].CreatedAt) {
+			return tasks[i].ID < tasks[j].ID
+		}
 		return tasks[i].CreatedAt.Before(tasks[j].CreatedAt)
 	})
 
@@ -224,7 +226,6 @@ func (s *Service) buildRow(c outbox.ContactState, tasks []outbox.Task, now time.
 			latestCRMTask = &copyTask
 		}
 	}
-
 
 	if latestCRMTask != nil {
 		t := *latestCRMTask

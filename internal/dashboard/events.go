@@ -44,19 +44,19 @@ type EventRow struct {
 	Decision       string      `json:"decision"`
 	DecisionReason string      `json:"decision_reason,omitempty"`
 	Status         string      `json:"status"`
-	NeedsAttention bool      `json:"needs_attention"`
+	NeedsAttention bool        `json:"needs_attention"`
 	CRMReceipt     string      `json:"crm_receipt,omitempty"`
 	Steps          []EventStep `json:"steps"`
 }
 
 type EventStats struct {
-	Received    int `json:"received"`
-	MetaAds     int `json:"meta_ads"`
-	Normal      int `json:"normal"`
-	CRMAccepted int `json:"crm_accepted"`
-	CRMRejected int `json:"crm_rejected"`
-	Uncertain   int `json:"uncertain"`
-	Attention   int `json:"attention"`
+	Received     int `json:"received"`
+	MetaAds      int `json:"meta_ads"`
+	Normal       int `json:"normal"`
+	CRMAccepted  int `json:"crm_accepted"`
+	CRMRejected  int `json:"crm_rejected"`
+	Uncertain    int `json:"uncertain"`
+	Attention    int `json:"attention"`
 	LocalBlocked int `json:"local_blocked"`
 }
 
@@ -286,7 +286,9 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 			if step.State == string(outbox.TaskUncertain) || step.State == string(outbox.TaskAttemptStarted) {
 				uncertain = true
 			}
-			if step.State == string(outbox.TaskPending) { pending = true }
+			if step.State == string(outbox.TaskPending) {
+				pending = true
+			}
 		}
 		switch {
 		case row.CRMReceipt != "":
@@ -315,7 +317,9 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 			row.NeedsAttention = true
 			result.Stats.Attention++
 		}
-		if row.Status == "bloqueado_local" { result.Stats.LocalBlocked++ }
+		if row.Status == "bloqueado_local" {
+			result.Stats.LocalBlocked++
+		}
 		result.Stats.Received++
 		if row.Source == "meta_ads" {
 			result.Stats.MetaAds++
