@@ -1,5 +1,8 @@
 # AGENTS.md — BotWhatsApp / Antigravity
 
+> **Ordem vigente 27/10 — PR #10 Draft:** consultar `docs/CTWA-NATIVE-HANDOFF-20261027.md` primeiro. Identidade Ads exclusivamente 5548996425287, papel Greeting separado proibido no mesmo número. Encaminhar proposta pela API nativa com token Sanctum dedicado; `POST /api/campaigns/schedule/execute` 415/416 é legado BLOQUEADO. A PR #10 já copiou as proteções de código da PR #9, não reaplicar sem diff. O painel de eventos requer login privado. Validar com `scripts/validate-ctwa-handoff-local.ps1` antes de liberar qualquer ação real. As referências a 0440, raw token e 416 batch abaixo são HISTÓRICAS.
+
+
 **Fonte canônica de instruções.** O arquivo `agent.md` é um alias. Leia `docs/START-HERE.md` e a skill `.agents/skills/relay-local-preflight/SKILL.md`.
 
 ## Verdade operacional (22/10/2026)
