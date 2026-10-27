@@ -68,17 +68,19 @@ def request_read(opener, base, path, token=None, method="GET"):
             return err.code, err.headers.get("Content-Type", ""), err.read(512)
 
 
-def run(base, token):
-    # Do not forward Authorization through HTTP_PROXY/HTTPS_PROXY by accident.\n    opener = build_opener(ProxyHandler({}), RejectRedirects())
+def run(base, token, panel_only=False):
+    # Do not forward Authorization through HTTP_PROXY/HTTPS_PROXY by accident.
+    opener = build_opener(ProxyHandler({}), RejectRedirects())
     checks = []
     def check(label, condition):
         checks.append((label, bool(condition)))
         print(("PASS" if condition else "FAIL") + ": " + label)
 
-    code, _, body = request_read(opener, base, "/healthz")
-    check("healthz HTTP 200", code == 200 and body.strip() == b"ok")
-    code, _, body = request_read(opener, base, "/readyz")
-    check("readyz HTTP 200 (nao atesta conectividade externa)", code == 200 and body.strip() == b"ready")
+    if not panel_only:
+        code, _, body = request_read(opener, base, "/healthz")
+        check("healthz HTTP 200", code == 200 and body.strip() == b"ok")
+        code, _, body = request_read(opener, base, "/readyz")
+        check("readyz HTTP 200 (nao atesta conectividade externa)", code == 200 and body.strip() == b"ready")
     for route in ["/dashboard", "/painel", "/api/dashboard/events?limit=10", "/api/dashboard/contacts"]:
         code, _, _ = request_read(opener, base, route)
         check(route + " sem senha bloqueado (401)", code == 401)
@@ -121,10 +123,12 @@ def main():
     parser.add_argument("--env", required=True, help="env privado atual do BotWhatsApp")
     parser.add_argument("--base-url", default="http://127.0.0.1:8788",
                         help="Origem única do painel; HTTP apenas localhost, externo exige HTTPS")
+    parser.add_argument("--panel-only", action="store_true",
+                        help="External HTTPS host only proxies manager panel routes")
     options = parser.parse_args()
     base = normalized_base(options.base_url)
     secret = read_panel_secret(options.env)
-    return run(base, secret)
+    return run(base, secret, panel_only=options.panel_only)
 
 
 if __name__ == "__main__":
