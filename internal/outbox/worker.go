@@ -506,6 +506,9 @@ func (w *Worker) executeScheduleNatal(ctx context.Context, task Task) error {
 		requestID := crm.NativeRequestID(task.ID)
 		dispatchUUID, err := w.cfg.NativeProposalScheduler.ScheduleNative(ctx, task.CRMPhone, requestID)
 		if err != nil {
+			if errors.Is(err, crm.ErrRejected) {
+				return w.recordSuppressed(task.ID, err.Error())
+			}
 			return w.recordUncertain(task.ID, err.Error())
 		}
 		return w.recordConfirmed(task.ID, "proposal-dispatch-"+dispatchUUID)
