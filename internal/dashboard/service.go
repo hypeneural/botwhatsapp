@@ -238,7 +238,7 @@ func (s *Service) buildRow(c outbox.ContactState, tasks []outbox.Task, now time.
 	if isAds {
 		row.Channel = "Meta Ads"
 	} else {
-		row.Channel = "Orgânico"
+		row.Channel = "Sem marcação de anúncio"
 	}
 
 	if contactName == "" {
