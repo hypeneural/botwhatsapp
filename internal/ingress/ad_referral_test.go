@@ -4,6 +4,7 @@ import (
   "encoding/json"
   "strings"
   "testing"
+	"github.com/hypeneural/botwhatsapp/internal/core"
 )
 
 func TestParseAdReferenceEvolutionGo072(t *testing.T) {
@@ -40,4 +41,18 @@ func TestInboundAuditRecordsNoClickID(t *testing.T) {
   got, _ := json.Marshal(ref)
   if !strings.Contains(string(got), "120251240551530388") || strings.Contains(string(got), "HIDDEN_CLICK_ID") { t.Fatalf("bad sanitized data: %s", got) }
   if !json.Valid(input) { t.Fatal("invalid fixture") }
+}
+
+func TestInboundAuditPersistsSourceWithoutClickIdentifier(t *testing.T) {
+	input := []byte(`{"event":"Message","instanceId":"ads","data":{"Info":{"ID":"ad-1","Chat":"5548999999999@s.whatsapp.net"},"Message":{"conversation":"Olá"},"referral":{"sourceType":"ad","sourceID":"120251240551530388","ctwaClid":"DONT_STORE_CLICK"}}}`)
+	env, err := core.Parse(input)
+	if err != nil { t.Fatal(err) }
+	dec := core.Select(env, core.Config{AdsUUID:"ads", AdsTriggers: []string{"Quero conhecer os pacotes de Natal em Tijucas"}, AdsFallback:true})
+	got := auditInbound(input, dec)
+	if got.AdSourceID != "120251240551530388" || got.AdEvidence != "evolution_referral" || got.Source != "meta_ads" {
+		t.Fatalf("wrong source audit: %+v",got)
+	}
+	persisted, err := json.Marshal(got)
+	if err != nil { t.Fatal(err) }
+	if strings.Contains(string(persisted),"DONT_STORE_CLICK") { t.Fatal("click identifier leaked into journal") }
 }
