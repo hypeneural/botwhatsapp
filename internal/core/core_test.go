@@ -46,3 +46,14 @@ func TestCRMPhone(t *testing.T){
  for _,s:=range []string{"5548996425287","554832200440"} {if _,ok:=CRMPhone(s);!ok{t.Fatal(s)}}
  for _,s:=range []string{"48996425287","551234","5599ABCDEF999","5511111111111111"} {if _,ok:=CRMPhone(s);ok{t.Fatal("accepted",s)}}
 }
+func TestLIDAliasPreservedOnEvolutionChatPhoneSwap(t *testing.T) {
+	cfg := Config{AdsUUID:"ads", AdsTriggers:[]string{"quero natal"}}
+	e := fixture("ads","5548999990001@s.whatsapp.net","quero natal","lid-swap")
+	e.Data.Info.SenderAlt = "777777@lid"
+	e.Data.Info.PushName = "Nome WhatsApp"
+	d := Select(e,cfg)
+	if d.PhoneE164!="5548999990001" || d.LIDAlias!="777777@lid" ||
+		d.Name!="Nome WhatsApp" || d.Action!=AdsProposal {
+		t.Fatalf("explicit JID mapping lost: %+v", d)
+	}
+}
