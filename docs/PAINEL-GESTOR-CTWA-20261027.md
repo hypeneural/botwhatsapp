@@ -47,7 +47,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate-ctwa-hand
 
 O script confirma SHA/branch, formata **apenas** arquivos Go da PR, roda `go test -count=1 ./...`, `go vet`, compilação de bot + preview, confere `git diff --check` e, se Node instalado, `node --check` do JS extraído da página. Gera relatório sanitizado no diretório TEMP sem imprimir ou transmitir segredos de produção.
 
-Só após PASS abre o servidor de demonstração `cmd/dashboard-preview`. O programa cria registros **fictícios** dos cinco cenários (CRM aceitou, CRM rejeitou 422, incerto, saudação normal, mensagem ignorada), escuta **apenas** 127.0.0.1 em porta aleatória e mostra no console URL e login **demo / demo-local**. Nunca aponta para `BOT_DATA_DIR` real nem para Evolution/CRM. Abrir URL no Chrome/Edge, testar:
+Só após PASS abre o servidor de demonstração `cmd/dashboard-preview`. O programa cria registros **fictícios** dos sete cenários (CRM aceitou, CRM rejeitou 422, incerto, saudação normal, mensagem ignorada, bloqueio local e mensagem de anúncio sem tarefas), escuta **apenas** 127.0.0.1 em porta aleatória e mostra no console URL e login **demo / demo-local**. Nunca aponta para `BOT_DATA_DIR` real nem para Evolution/CRM. Abrir URL no Chrome/Edge, testar:
 1. Desktop: contadores, filtro **Precisam de atenção**, filtro de origem, gatilho e expansão do histórico de APIs.
 2. Mobile: DevTools → largura 390 px; sem rolagem horizontal da tabela, cartões completos, labels legíveis, botões acessíveis.
 3. Abrir **contatos agrupados**: só então carrega o resumo.
