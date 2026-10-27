@@ -269,6 +269,9 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 		for _, step := range row.Steps {
 			if step.Provider == "Evydência CRM" {
 				crmStep = true
+				if step.State == string(outbox.TaskConfirmed) && step.ExternalID == "" {
+					uncertain = true // No receipt: never claim success.
+				}
 				if strings.HasPrefix(step.Reason, "HTTP 422:") ||
 					strings.HasPrefix(step.Reason, "HTTP 401:") ||
 					strings.HasPrefix(step.Reason, "HTTP 403:") ||
