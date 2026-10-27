@@ -4,6 +4,9 @@ package main
 
 import (
 	"crypto/sha256"
+	"context"
+	"errors"
+	"os/signal"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -108,5 +111,20 @@ func main(){
 	fmt.Println("Usuário: demo | Senha: "+demoPassword)
 	fmt.Println("Somente loopback, sem envios externos. Encerrar: Ctrl+C")
 	srv:=&http.Server{Handler:mux,ReadHeaderTimeout:5*time.Second}
-	log.Fatal(srv.Serve(l))
+	stop:=make(chan os.Signal,1)
+	signal.Notify(stop,os.Interrupt)
+	defer signal.Stop(stop)
+	serveErr:=make(chan error,1)
+	go func(){serveErr<-srv.Serve(l)}()
+	select {
+	case <-stop:
+		ctx,cancel:=context.WithTimeout(context.Background(),3*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(ctx)
+	case err:=<-serveErr:
+		if err!=nil && !errors.Is(err,http.ErrServerClosed) {
+			log.Printf("preview local finalizado por erro: %v",err)
+		}
+	}
+
 }
