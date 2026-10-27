@@ -184,6 +184,7 @@ footer{color:#65746b;font-size:12px;padding:12px 2px 0}
         <option value="incerto">Resultado incerto</option>
         <option value="pendente">Pendente</option>
         <option value="sem_tarefas">Sem execução registrada</option>
+        <option value="telefone_nao_resolvido">Telefone ainda não identificado</option>
         <option value="finalizado_local">Atendimento local</option>
         <option value="ignorado">Ignorados / bloqueados</option>
       </select>
@@ -236,7 +237,9 @@ const statusLabels = {
   bloqueado_local:['Bloqueado antes do CRM','warning'],
   crm_nao_registrado:['Etapa CRM não registrada','warning'],
   finalizado_local:['Atendimento local finalizado','neutral'], ignorado:['Ignorado','neutral'],
-  opt_out:['Contato pediu para parar','warning'], recebido:['Recebido','neutral']
+  opt_out:['Contato pediu para parar','warning'],
+  telefone_nao_resolvido:['Telefone pendente de identificação','warning'],
+  recebido:['Recebido','neutral']
 };
 function showStatus(msg, error) {
   $('connectionLine').classList.toggle('error', Boolean(error));
