@@ -14,6 +14,38 @@ Escopo: botwhatsapp PR #10, branch fix/ctwa-native-proposal-handoff-20261027. Se
 - cmd/botwhatsapp/main.go: BOT_ENABLED=true exige BOT_DASHBOARD_TOKEN com no minimo 32 caracteres e encerra inicializacao se ausente. Essa guarda e intencional; nao suprimir para forcar deploy.
 - scripts/preflight-ctwa-production-readonly.sh: verifica formato Sanctum ID|segredo e origem oficial HTTPS, mas NAO prova token emitido no CRM. Para provar token, usar verificador PHP read-only no host Laravel autorizado.
 
+
+## AUDITORIA POS-DEPLOY 27/10 — Gate real que falta
+
+**Relato do Antigravity:** botwhatsapp-stage-bot-1 recriado na VPS sobre HEAD 13c9f8bccbb57279e58f3805de1370f747455d59; /healthz=200; /dashboard=401 sem auth e 200 com Basic; token Sanctum existente obteve HTTP 422 de validacao de formulario ausente; PASS_CONFIG 16/16; um worker e spool persistente. Tudo isso comprova liveness/autenticacao basica mas NAO processamento de lead, API JSON, TLS do gestor, PDF pela Evolution ou proposta entregue. Nao chamar "100% funcional" ate canario com recibos.
+
+**Nova branch PR #10:** scripts/audit-ctwa-panel-readonly.py e teste offline, acrescidos do gate scripts/validate-ctwa-p0-credentials.sh. Um ajuste no internal/ingress/server.go agora proibe listagem de diretorios da rota /static/ sem bloquear GET do PDF concreto; teste em internal/ingress/server_test.go. **Esses arquivos/ajustes posteriores ao HEAD 13c9 nao estao necessariamente na imagem atualmente em producao**. Nenhum novo deploy esta implicito. Checar Git SHA, imagem/digest e testes antes de novo corte.
+
+### PASS do painel HTTP — nao expor segredo
+No host bot, a partir do checkout da branch (e sem imprimir .env):
+```bash
+python3 scripts/audit-ctwa-panel-readonly.py --env /srv/platform/stacks/botwhatsapp/.env.production
+```
+O script testa GET /healthz e /readyz; 401 anonimo para /dashboard, /painel e as duas APIs; HTML autenticado, URL absoluta same-origin, HEAD autenticado, JSON real de /api/dashboard/events?limit=10 e /api/dashboard/contacts. Apenas quantidades agregadas sao exibidas. Nenhum POST, webhook ou envio real; senha Basic so em memoria, nunca em argumento shell ou log; redirects e proxies desativados. O 200 HTML anterior nao comprova estes checks.
+
+**No endereco HTTPS privado REAL do gestor**, confirmar hostname, proxy Caddy e rotas na raiz; repetir opcionalmente com --base-url https://HOST_VALIDADO_PRIVADO sem usar hostname inventado. Antes de apontar a ferramenta para um host remoto, confirmar que ele pertence a infraestrutura autorizada (o script transmite Basic Auth a origem indicada). HTTPS certificado valido; jamais usar Basic Auth por HTTP remoto. Inspecionar browser desktop e 390px, inclusive refresh, filtros e carregamento da secao de contatos. As requisicoes fetch de JS sao same-origin e usam new URL('/api/dashboard/...', window.location.origin): isso so funciona se proxy expoe /api/dashboard/* no mesmo origin e na raiz. Verificar CSP, no-store e ausencia de erros 401/404/CORS/JS no DevTools.
+
+### PDF e audio via Evolution: NAO inferir por healthz
+Em producao o codigo do bot escolhe BOT_ADS_DOCUMENT_URL antes de BOT_ADS_DOCUMENT_FILE para enviar o PDF. URL padrao http://bot:8788/static/Proposta_Natal.pdf; a Evolution precisa resolver "bot" na rede Docker compartilhada e baixar o PDF. Conferir DNS e rede real, sem criar um segundo worker:
+1. Identificar o container Evolution pelo inventario atual, nao nome presumido.
+2. Fazer GET/HEAD **dentro da rede/contêiner Evolution**, sem token comercial, ao endereco exato BOT_ADS_DOCUMENT_URL efetivo; exigir 200 e arquivo PDF valido. Se imagem nao tiver curl/wget, classificar SKIP e usar probe de rede segregado autorizado, sem mexer no processo Evolution.
+3. Confirmar API Evolution /instance/status conectada e instancia Ads UUID 5287 correta, SOMENTE GET autenticado por metodo privado seguro e resultado sanitizado; nao confundir "Connected" momentaneo com entrega.
+4. Audio OGG Opus e tamanho conferidos na montagem real do bot. PDF/AUDIO presente no host nao implica GET alcançavel pelo Evolution. A rota /static/ nao pode revelar indice de pasta e Caddy nao deve expo-la publicamente; o arquivo concreto deve continuar disponivel internamente.
+
+### Entrada duravel e ultimo gate
+1. Confirmar painel JSON vazio ou historico real, sem vazamento de PII; comparar contagem com journal real e quantidade de tasks; consultar /readyz.
+2. Um canario novo previamente consentido no 5287: webhook -> journal -> outbox -> texto/audio/PDF Evolution aceita -> CRM agenda com UUID nativo (idempotencia) -> verificar dispatch no CRM -> verificar processamento posterior (Z-API ou outro canal do CRM).
+3. Sem confirmacao do dispatch em CRM e da cadeia Evolution, status e **GO somento para teste/canario**, nao GO TOTAL de funil. Nenhum replay dos 13 leads antigos.
+4. Se houver erro ou UNKNOWN, nao rediscagem automatica. Conservar spool/claims/opt-outs e rollback apenas do bot usando backup/digest confirmado.
+
+### CI e mudancas apos deploy
+O job no SHA 13c9 foi consultado como "cancelled"; o PASS anterior refere-se a SHA distinto. Uma PR sem divergencia da main nao garante imagem identica. No novo HEAD, executar teste focado unico e CI; nunca aplicar git reset/clean ou trocar Compose/volume para forcar PASS. O runtime implantado permanece em 13c9 ate evidencia contraria por SHA/digest.
+
 ## Fase 1 — Avell / Antigravity (sem rede produtiva)
 Na PR #10: git fetch, verificar HEAD/diff, atualizar com fast-forward, sem reset. Rodar gate local já existente scripts/validate-ctwa-handoff-local.ps1 no HEAD final. Para novos scripts, bash scripts/validate-ctwa-p0-credentials.sh executa preflight falso, unittest privado, php -l quando disponível. Não usar -Preview se já homologado o mesmo HTML.
 
