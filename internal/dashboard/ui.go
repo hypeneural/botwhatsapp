@@ -566,7 +566,7 @@ function renderEvents() {
     if (filter !== 'all' && filter !== 'attention' && filter !== 'ignorado' && filter !== e.status) return false;
 
     // Search term:
-    return !term || [e.name, e.phone, e.inbound_text, e.trigger_text, e.crm_receipt, e.decision_reason]
+    return !term || [e.name, e.phone, e.inbound_text, e.trigger_text, e.ad_source_id, e.crm_receipt, e.decision_reason]
       .some(t => String(t || '').toLocaleLowerCase('pt-BR').includes(term));
   });
 
@@ -580,7 +580,7 @@ function renderEvents() {
   $('eventRows').innerHTML = found.map(e => {
     const label = statusLabels[e.status] || ['Estado não identificado', 'neutral'];
     const sourceTag = e.source === 'meta_ads'
-      ? badge('Anúncio Meta', 'ads', '<svg viewBox="0 0 20 20" width="12" height="12" fill="currentColor"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11.93V14a1 1 0 11-2 0v-.07A6.002 6.002 0 014.07 9H4a1 1 0 110-2h.07A6.002 6.002 0 019 4.07V4a1 1 0 112 0v.07A6.002 6.002 0 0115.93 9H16a1 1 0 110 2h-.07A6.002 6.002 0 0111 13.93zM10 12a2 2 0 100-4 2 2 0 000 4z"/></svg>')
+      ? badge(e.ad_source_id ? 'Referência de anúncio' : 'Indício de anúncio', 'ads', '<svg viewBox="0 0 20 20" width="12" height="12" fill="currentColor"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11.93V14a1 1 0 11-2 0v-.07A6.002 6.002 0 014.07 9H4a1 1 0 110-2h.07A6.002 6.002 0 019 4.07V4a1 1 0 112 0v.07A6.002 6.002 0 0115.93 9H16a1 1 0 110 2h-.07A6.002 6.002 0 0111 13.93zM10 12a2 2 0 100-4 2 2 0 000 4z"/></svg>')
       : badge('Sem marcação', 'normal');
 
     const nameSource = e.name_origin === 'crm' ? 'Nome confirmado no CRM' :
@@ -599,6 +599,8 @@ function renderEvents() {
       : '<div class="sub">' + safe(e.phone || 'Telefone não identificado') + '</div>';
 
     const message = safe(e.inbound_text || '(texto não registrado)');
+    const reference = e.ad_source_id ?
+      '<div class="sub">Referência de origem: <code>' + safe(e.ad_source_id) + '</code> · conferir Ad ID na Meta</div>' : '';
     const trigger = e.trigger_matched ?
       '<div class="trigger-badge">✓ Gatilho: ' + safe(e.trigger_text || '') + '</div>' :
       '<div class="sub">Sem gatilho exato' + (e.has_ad_context ? ' · contexto Meta presente' : '') + '</div>';
@@ -616,7 +618,7 @@ function renderEvents() {
         phoneDisplay +
         '<div style="margin-top:6px">' + sourceTag + '</div></td>' +
       '<td data-label="Mensagem / Gatilho"><div class="message">' + message + '</div>' +
-        '<div class="sub">Tipo: ' + safe(e.inbound_type || 'Não informado') + '</div>' + trigger + '</td>' +
+        '<div class="sub">Tipo: ' + safe(e.inbound_type || 'Não informado') + '</div>' + trigger + reference + '</td>' +
       '<td data-label="Resultado">' + badge(label[0], label[1]) +
         receiptHTML +
         (e.status === 'crm_aceito' ? '<div class="sub">Despacho registrado, entrega ao cliente não verificada.</div>' : '') +
