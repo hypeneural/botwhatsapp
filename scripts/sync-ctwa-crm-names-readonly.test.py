@@ -54,6 +54,18 @@ class NamesReadOnlyTest(unittest.TestCase):
                 (root/"contacts"/f"{idx}.json").write_text(json.dumps({"phone_e164":phone}),encoding="utf-8")
             self.assertEqual(module.contact_numbers(root), ["5548999990001","5548999990002"])
 
+    def test_existing_read_token_file_requires_private_mode(self):
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "crm_read.token"
+            path.write_text("17|" + "a" * 40 + "\\n", encoding="utf-8")
+            os.chmod(path, 0o600)
+            self.assertEqual(module.token_from_private_file(path), "17|" + "a" * 40)
+            os.chmod(path, 0o644)
+            with self.assertRaises(ValueError):
+                module.token_from_private_file(path)
+
     def test_cache_written_privately(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp)/"crm-names-cache.json"
