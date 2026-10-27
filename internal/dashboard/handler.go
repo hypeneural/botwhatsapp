@@ -4,6 +4,7 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -69,6 +70,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		_ = json.NewEncoder(w).Encode(summary)
+
+	case path == "/api/dashboard/events":
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		history, err := h.service.GetEvents(limit)
+		if err != nil {
+			http.Error(w, "failed to load event history", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		_ = json.NewEncoder(w).Encode(history)
 
 	case path == "/painel" || path == "/dashboard":
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
