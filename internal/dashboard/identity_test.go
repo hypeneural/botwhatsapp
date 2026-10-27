@@ -95,6 +95,17 @@ func TestDashboardCRMNameCacheIsBoundToVerifiedPhone(t *testing.T) {
 	blob,err = json.Marshal(cache)
 	if err != nil {t.Fatal(err)}
 	if err := os.WriteFile(filepath.Join(dir,"crm-names-cache.json"),blob,0600); err != nil {t.Fatal(err)}
+	writeIdentityFixture(t, dir, strings.Repeat("d",64), core.Decision{
+		Action:core.Ignore, InstanceID:"ads", MessageID:"d",
+		PhoneE164:"5548999990001", ReplyJID:"5548999990001@s.whatsapp.net",
+		Name:"Apelido WhatsApp",
+	}, time.Now().UTC())
+	events,err := NewService(dir).GetEvents(10)
+	if err != nil { t.Fatal(err) }
+	if len(events.Events)!=1 || events.Events[0].Name!="Nome confirmado no CRM" ||
+		events.Events[0].NameOrigin!="crm" {
+		t.Fatalf("CRM cache must win on event display, got %+v",events.Events)
+	}
 	summary,err := NewService(dir).GetSummary()
 	if err != nil {t.Fatal(err)}
 	if len(summary.Contacts)!=1 || summary.Contacts[0].Name!="Nome confirmado no CRM" {
