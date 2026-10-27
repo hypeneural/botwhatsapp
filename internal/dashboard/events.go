@@ -30,6 +30,9 @@ type EventStep struct {
 }
 
 type EventRow struct {
+	// Private join keys for historical, exact-match LID resolution. Never sent as JSON.
+	phoneE164     string
+	replyJID      string
 	EventKey       string      `json:"event_key"`
 	ReceivedAt     time.Time   `json:"received_at"`
 	ReceivedAtBRT  string      `json:"received_at_brt"`
@@ -186,6 +189,7 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 			inboundType = "não registrado (legado)"
 		}
 		row := EventRow{
+			phoneE164: rec.Decision.PhoneE164, replyJID: rec.Decision.ReplyJID,
 			EventKey: key, ReceivedAt: at, ReceivedAtBRT: formatEventBRT(at),
 			Phone: FormatPhone(rec.Decision.PhoneE164), Name: rec.Decision.Name,
 			Source: source, InboundType: inboundType,
@@ -196,10 +200,20 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 			Status: "recebido", Steps: make([]EventStep, 0),
 		}
 		if row.Phone == "" {
-			row.Phone = "Telefone não resolvido"
+			if strings.HasSuffix(row.replyJID, "@lid") {
+				row.Phone = "Número oculto pelo WhatsApp (LID)"
+			} else {
+				row.Phone = "Telefone não informado"
+			}
 		}
+		// An empty name is NOT evidence that the person is named 'Contato WhatsApp'.
+		// A later exact phone/LID join or optional private CRM cache may fill it.
 		if row.Name == "" {
-			row.Name = "Contato WhatsApp"
+			row.Name = "Nome não informado"
+		}
+		if row.Decision == string(core.Ignore) && row.DecisionReason == "unresolved_phone_or_non_private_chat" &&
+			strings.HasSuffix(row.replyJID, "@lid") {
+			row.Status = "telefone_nao_resolvido"
 		}
 		if row.Decision == string(core.Ignore) {
 			row.Status = "ignorado"
@@ -209,6 +223,53 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 		}
 		byKey[key] = len(result.Events)
 		result.Events = append(result.Events, row)
+	}
+	// Resolve display identity ONLY from an earlier verified, exact same LID
+	// or E.164 phone in this loaded window. NEVER guess the phone from LID digits.
+	// Conflicting LID -> phone observations are discarded as ambiguous.
+	type phoneObservation struct { phone, name string; conflicted bool }
+	observedLIDs := make(map[string]phoneObservation)
+	knownNames := make(map[string]string)
+	for _, row := range result.Events {
+		if row.phoneE164 == "" {
+			continue
+		}
+		if _, valid := core.JIDPhone(row.phoneE164 + "@s.whatsapp.net"); !valid {
+			continue
+		}
+		if row.Name != "" && row.Name != "Nome não informado" && knownNames[row.phoneE164] == "" {
+			knownNames[row.phoneE164] = row.Name
+		}
+		if strings.HasSuffix(row.replyJID, "@lid") {
+			old, found := observedLIDs[row.replyJID]
+			if !found {
+				observedLIDs[row.replyJID] = phoneObservation{phone: row.phoneE164, name: row.Name}
+			} else if old.phone != row.phoneE164 {
+				old.conflicted = true
+				observedLIDs[row.replyJID] = old
+			}
+		}
+	}
+	for i := range result.Events {
+		row := &result.Events[i]
+		if row.phoneE164 == "" && strings.HasSuffix(row.replyJID, "@lid") {
+			if obs, found := observedLIDs[row.replyJID]; found && !obs.conflicted {
+				row.phoneE164 = obs.phone
+				row.Phone = FormatPhone(obs.phone)
+				if row.Name == "Nome não informado" && obs.name != "Nome não informado" {
+					row.Name = obs.name
+				}
+				// Historical exact-match enrichment only affects display, never
+				// backfills contact policy or triggers an outbound CRM call.
+			}
+		}
+		if row.Name == "Nome não informado" && knownNames[row.phoneE164] != "" {
+			row.Name = knownNames[row.phoneE164]
+		}
+		if row.DecisionReason == "unresolved_phone_or_non_private_chat" &&
+			row.Status == "telefone_nao_resolvido" && row.phoneE164 != "" {
+			row.Status = "ignorado"
+		}
 	}
 	// A single scan of task FILENAMES, with JSON reads only for matching events.
 	tasks, err := os.ReadDir(filepath.Join(s.dataDir, "tasks"))
@@ -310,7 +371,7 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 		// allow five minutes for the worker to commit the remaining stages.
 		age := time.Since(row.ReceivedAt)
 		if row.Status == "crm_rejeitado" || row.Status == "incerto" ||
-			row.Status == "bloqueado_local" ||
+			row.Status == "bloqueado_local" || row.Status == "telefone_nao_resolvido" ||
 			(age > 5*time.Minute && row.Decision == string(core.AdsProposal) &&
 				(row.Status == "sem_tarefas" || row.Status == "crm_nao_registrado" ||
 					row.Status == "pendente" || row.Status == "em_processamento")) {
