@@ -49,7 +49,7 @@ if [[ "$(value BOT_ADS_PHONE)" == "5548996425287" ]]; then pass "WhatsApp de anu
 if [[ -z "$(value BOT_GREETING_PHONE)" && -z "$(value BOT_GREETING_INSTANCE_UUID)" ]]; then
   pass "sem segundo papel Greeting no 5287"
 else
-  warn "role Greeting separado configurado: validar telefone/UUID distinto antes do rollout"
+  fail "para esta implantacao CTWA 5287, BOT_GREETING_PHONE e BOT_GREETING_INSTANCE_UUID devem estar vazios"
 fi
 check_true BOT_ENABLED
 check_true BOT_OUTBOUND_ENABLED
