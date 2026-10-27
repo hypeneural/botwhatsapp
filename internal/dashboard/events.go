@@ -351,7 +351,7 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 			// This may be a suppressed greeting, a preview or a historical gap.
 			row.Status = "sem_tarefas"
 		}
-		uncertain, rejected, localBlocked, pending, crmStep := false, false, false, false, false
+		uncertain, rejected, localBlocked, pending, activeAttempt, crmStep := false, false, false, false, false, false
 		for _, step := range row.Steps {
 			if step.Provider == "Evydência CRM" {
 				crmStep = true
@@ -382,6 +382,8 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 				}
 				if time.Since(started) > 2*time.Minute {
 					uncertain = true
+				} else {
+					activeAttempt = true
 				}
 			}
 			if step.State == string(outbox.TaskPending) {
@@ -399,6 +401,8 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 			row.Status = "incerto"
 		case pending:
 			row.Status = "pendente"
+		case activeAttempt:
+			row.Status = "em_processamento"
 		case len(row.Steps) > 0 && row.Decision == string(core.AdsProposal) && !crmStep:
 			row.Status = "crm_nao_registrado"
 		case len(row.Steps) > 0:
