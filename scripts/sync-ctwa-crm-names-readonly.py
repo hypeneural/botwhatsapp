@@ -43,6 +43,16 @@ def token_from_env(envpath: Path):
     return values[0]
 
 
+def token_from_private_file(path: Path):
+    """Use an existing extension token with customer-read, never expose value."""
+    if path.is_symlink() or not path.is_file() or stat.S_IMODE(path.stat().st_mode) & 0o077:
+        raise ValueError("arquivo da credencial de leitura nao e privado (exigir 0600)")
+    value = path.read_text(encoding="utf-8").strip()
+    if not re.fullmatch(r"[1-9][0-9]*\\|[a-zA-Z0-9]{40,}", value):
+        raise ValueError("credencial de leitura nao tem formato Sanctum")
+    return value
+
+
 def contact_numbers(spool: Path):
     contacts = spool / "contacts"
     if not contacts.is_dir() or spool.is_symlink():
@@ -141,12 +151,15 @@ def main():
     p.add_argument("--env", required=True)
     p.add_argument("--spool", required=True)
     p.add_argument("--limit", type=int, default=40)
+    p.add_argument("--read-token-file", type=Path,
+                   help="token Sanctum EXISTENTE com extension:customer-read, em arquivo 0600")
     p.add_argument("--apply", action="store_true")
     args = p.parse_args()
     if args.limit < 1 or args.limit > 100:
         p.error("--limit entre 1 e 100")
     envpath, spool = Path(args.env), Path(args.spool)
-    token = token_from_env(envpath)
+    token = (token_from_private_file(args.read_token_file)
+             if args.read_token_file is not None else token_from_env(envpath))
     numbers = contact_numbers(spool)
     cachepath = spool / "crm-names-cache.json"
     entries = load_cache(cachepath)
