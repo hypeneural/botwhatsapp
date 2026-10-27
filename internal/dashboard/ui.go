@@ -157,7 +157,7 @@ footer{color:#65746b;font-size:12px;padding:12px 2px 0}
     <div class="metric"><span class="heading">Mensagens recebidas</span><span class="value" id="kpiReceived">—</span><span class="detail">Na janela consultada</span></div>
     <div class="metric"><span class="heading">Identificadas como anúncio</span><span class="value" id="kpiAds">—</span><span class="detail">Gatilho ou indicação Meta</span></div>
     <div class="metric positive"><span class="heading">Propostas aceitas pelo CRM</span><span class="value" id="kpiAccepted">—</span><span class="detail">Agendadas, não entregues</span></div>
-    <div class="metric attention"><span class="heading">Precisam de atenção</span><span class="value" id="kpiAttention">—</span><span class="detail">Rejeitadas + incertas</span></div>
+    <div class="metric attention"><span class="heading">Precisam de atenção</span><span class="value" id="kpiAttention">—</span><span class="detail">Rejeitadas, incertas ou bloqueadas</span></div>
   </div>
 
   <section class="section" aria-labelledby="historyHeading">
@@ -179,6 +179,8 @@ footer{color:#65746b;font-size:12px;padding:12px 2px 0}
         <option value="attention">Precisam de atenção</option>
         <option value="crm_aceito">CRM aceitou</option>
         <option value="crm_rejeitado">CRM rejeitou</option>
+        <option value="bloqueado_local">Bot bloqueou antes do CRM</option>
+        <option value="crm_nao_registrado">Sem etapa CRM registrada</option>
         <option value="incerto">Resultado incerto</option>
         <option value="pendente">Pendente</option>
         <option value="sem_tarefas">Sem execução registrada</option>
@@ -199,7 +201,7 @@ footer{color:#65746b;font-size:12px;padding:12px 2px 0}
         <tbody id="eventRows"><tr><td colspan="5" class="empty">Carregando...</td></tr></tbody>
       </table>
     </div>
-    <div class="hint">"CRM aceitou" significa que a proposta foi agendada. Não significa que o destinatário recebeu ou leu a mensagem. "Sem marcação de anúncio" não comprova origem orgânica. Histórico anterior pode estar incompleto.</div>
+    <div class="hint">O filtro "Precisam de atenção" também inclui mensagens de anúncio sem encaminhamento após cinco minutos e bloqueios internos do bot. "CRM rejeitou" só aparece quando houve uma recusa HTTP comprovada. "CRM aceitou" significa que a proposta foi agendada. Não significa que o destinatário recebeu ou leu a mensagem. "Sem marcação de anúncio" não comprova origem orgânica. Histórico anterior pode estar incompleto.</div>
   </section>
 
   <section class="section" aria-label="Resumo de contatos">
@@ -231,6 +233,8 @@ const statusLabels = {
   crm_aceito:['CRM aceitou','success'], crm_rejeitado:['CRM rejeitou','danger'],
   incerto:['Resultado incerto','danger'], pendente:['Pendente','warning'],
   em_processamento:['Em andamento','warning'], sem_tarefas:['Sem execução registrada','neutral'],
+  bloqueado_local:['Bloqueado antes do CRM','warning'],
+  crm_nao_registrado:['Etapa CRM não registrada','warning'],
   finalizado_local:['Atendimento local finalizado','neutral'], ignorado:['Ignorado','neutral'],
   opt_out:['Contato pediu para parar','warning'], recebido:['Recebido','neutral']
 };
@@ -255,7 +259,7 @@ function renderEvents() {
   const term=$('searchEvents').value.trim().toLocaleLowerCase('pt-BR');
   const found=state.events.filter(e => {
     if (source!=='all' && source!==e.source) return false;
-    if (filter==='attention' && e.status!=='crm_rejeitado' && e.status!=='incerto') return false;
+    if (filter==='attention' && !e.needs_attention) return false;
     if (filter==='ignorado' && e.status!=='ignorado' && e.status!=='opt_out') return false;
     if (filter!=='all' && filter!=='attention' && filter!=='ignorado' && filter!==e.status) return false;
     return !term || [e.name,e.phone,e.inbound_text,e.trigger_text,e.crm_receipt,e.decision_reason]
@@ -268,7 +272,7 @@ function renderEvents() {
   }
   $('eventRows').innerHTML=found.map(e => {
     const label=statusLabels[e.status] || ['Estado não identificado','neutral'];
-    const sourceTag=e.source==='meta_ads' ? badge('Anúncio identificado','ads') : badge('Sem marcação de anúncio','normal');
+    const sourceTag=e.source==='meta_ads' ? badge('Indício de anúncio','ads') : badge('Sem marcação de anúncio','normal');
     const message=safe(e.inbound_text || '(texto não registrado)');
     const trigger=e.trigger_matched ?
       '<div class="trigger">Gatilho reconhecido'+(e.trigger_text ? ': '+safe(e.trigger_text) : '')+'</div>' :
@@ -325,7 +329,9 @@ async function refreshData(){
     $('kpiReceived').textContent=data.stats.received||0;
     $('kpiAds').textContent=data.stats.meta_ads||0;
     $('kpiAccepted').textContent=data.stats.crm_accepted||0;
-    $('kpiAttention').textContent=(data.stats.crm_rejected||0)+(data.stats.uncertain||0);
+    $('kpiAttention').textContent=data.stats.attention == null
+      ? (data.stats.crm_rejected||0)+(data.stats.uncertain||0)
+      : data.stats.attention;
     state.lastSuccess=new Date().toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',hour12:false});
     showStatus('Histórico consultado com sucesso.',false);
     renderEvents();
