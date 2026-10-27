@@ -92,9 +92,12 @@ func (s *Service) readCRMNameCache() map[string]string {
 		return result
 	}
 	var data struct {
+		GeneratedAt time.Time `json:"generated_at"`
 		Names map[string]string `json:"names"`
 	}
-	if json.Unmarshal(raw, &data) != nil {
+	if json.Unmarshal(raw, &data) != nil ||
+		data.GeneratedAt.IsZero() || time.Since(data.GeneratedAt) > 48*time.Hour ||
+		time.Until(data.GeneratedAt) > 5*time.Minute {
 		return result
 	}
 	for phone, name := range data.Names {
