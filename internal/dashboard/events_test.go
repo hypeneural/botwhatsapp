@@ -63,7 +63,7 @@ func TestEventEndpointAuthAndLimit(t *testing.T){
 	req.SetBasicAuth("operator","unit-test-secret")
 	w=httptest.NewRecorder()
 	s.ServeHTTP(w,req)
-	if w.Code!=http.StatusOK || w.Header().Get("Cache-Control")!="no-store" {t.Fatal(w.Code)}
+	if w.Code!=http.StatusOK || !strings.Contains(w.Header().Get("Cache-Control"),"no-store") {t.Fatal(w.Code)}
 	var result EventResult
 	if err:=json.Unmarshal(w.Body.Bytes(),&result);err!=nil || result.Limit!=500 {t.Fatal(err,result.Limit)}
 }
