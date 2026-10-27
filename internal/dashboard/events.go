@@ -380,7 +380,7 @@ func safeEventReason(reason string) string {
 		return "HTTP 403: permissão insuficiente"
 	case strings.Contains(lower, "http 429"):
 		return "HTTP 429: limite de requisições"
-	case strings.Contains(lower, "cooldown"):
+	case strings.Contains(lower, "cooldown"), strings.Contains(lower, "already claimed"), strings.Contains(lower, "duplicate"):
 		return "Cooldown / duplicidade"
 	case strings.Contains(lower, "suppressed"), strings.Contains(lower, "opt-out"), strings.Contains(lower, "human"):
 		return "Supressão ou atendimento humano"
