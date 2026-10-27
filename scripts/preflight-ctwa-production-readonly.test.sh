@@ -17,8 +17,8 @@ BOT_ADS_INSTANCE_UUID=demo-ads-instance
 BOT_ADS_WEBHOOK_SECRET=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 EVOLUTION_ADS_APIKEY=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 BOT_DASHBOARD_TOKEN=cccccccccccccccccccccccccccccccccccccccc
-EVIDENCIA_CRM_PROPOSAL_SANCTUM_TOKEN=dddddddddddddddddddddddddddddddddddddddd
-EVIDENCIA_CRM_BASE_URL=https://example.invalid
+EVIDENCIA_CRM_PROPOSAL_SANCTUM_TOKEN=17|dddddddddddddddddddddddddddddddddddddddd
+EVIDENCIA_CRM_BASE_URL=https://evydencia.com
 EVOLUTION_GO_BASE_URL=http://127.0.0.1:12345
 BOT_ADS_AUDIO_FILE=/app/assets/example.ogg
 BOT_ADS_DOCUMENT_URL=http://127.0.0.1:8788/static/example.pdf
@@ -41,6 +41,17 @@ if bash "$root/scripts/preflight-ctwa-production-readonly.sh" "$tmp/settings.env
   echo "FAIL: legacy WhatsApp 0440 was accepted" >&2; exit 1
 fi
 sed -i 's/^BOT_ADS_PHONE=.*/BOT_ADS_PHONE=5548996425287/' "$tmp/settings.env"
+# Wrong origin must fail, including HTTPS hosts where credentials could leak.
+sed -i 's#^EVIDENCIA_CRM_BASE_URL=.*#EVIDENCIA_CRM_BASE_URL=https://example.invalid#' "$tmp/settings.env"
+if bash "$root/scripts/preflight-ctwa-production-readonly.sh" "$tmp/settings.env" "$tmp/spool" > "$tmp/fail.log" 2>&1; then
+  echo "FAIL: non-official CRM origin was accepted" >&2; exit 1
+fi
+sed -i 's#^EVIDENCIA_CRM_BASE_URL=.*#EVIDENCIA_CRM_BASE_URL=https://evydencia.com#' "$tmp/settings.env"
+# A random string (even if long) cannot substitute for a CRM-issued Sanctum token.
+sed -i 's/^EVIDENCIA_CRM_PROPOSAL_SANCTUM_TOKEN=.*/EVIDENCIA_CRM_PROPOSAL_SANCTUM_TOKEN=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee/' "$tmp/settings.env"
+if bash "$root/scripts/preflight-ctwa-production-readonly.sh" "$tmp/settings.env" "$tmp/spool" > "$tmp/fail.log" 2>&1; then
+  echo "FAIL: fake Sanctum token format was accepted" >&2; exit 1
+fi
 sed -i 's/^EVIDENCIA_CRM_PROPOSAL_SANCTUM_TOKEN=.*/EVIDENCIA_CRM_PROPOSAL_SANCTUM_TOKEN=/' "$tmp/settings.env"
 if bash "$root/scripts/preflight-ctwa-production-readonly.sh" "$tmp/settings.env" "$tmp/spool" > "$tmp/fail.log" 2>&1; then
   echo "FAIL: missing Sanctum credential was accepted" >&2; exit 1
