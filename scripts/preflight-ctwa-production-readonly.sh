@@ -59,7 +59,20 @@ check_secret BOT_ADS_WEBHOOK_SECRET 32
 check_secret EVOLUTION_ADS_APIKEY 8
 check_secret BOT_DASHBOARD_TOKEN 32
 check_secret EVIDENCIA_CRM_PROPOSAL_SANCTUM_TOKEN 32
-if [[ "$(value EVIDENCIA_CRM_BASE_URL)" =~ ^https://[^[:space:]]+$ ]]; then pass "CRM acessado via HTTPS"; else fail "EVIDENCIA_CRM_BASE_URL precisa ser HTTPS"; fi
+# Sanctum createToken() emits ID|plainTextToken. This is a shape check only,
+# not proof of permission, expiry, CRM user eligibility or token existence.
+native_token="$(value EVIDENCIA_CRM_PROPOSAL_SANCTUM_TOKEN)"
+if [[ "$native_token" =~ ^[1-9][0-9]*\\|[a-zA-Z0-9]{40,}$ ]]; then
+  pass "formato Sanctum ID|token valido (ability e usuario NAO verificados)"
+else
+  fail "token Sanctum fora do formato nativo ID|segredo; nao preencher aleatoriamente"
+fi
+unset native_token
+if [[ "$(value EVIDENCIA_CRM_BASE_URL)" == "https://evydencia.com" ]]; then
+  pass "origem CRM HTTPS oficial confirmada"
+else
+  fail "EVIDENCIA_CRM_BASE_URL nao corresponde a origem HTTPS oficial"
+fi
 if [[ "$(value EVOLUTION_GO_BASE_URL)" =~ ^https?://[^[:space:]]+$ ]]; then pass "URL Evolution definida"; else fail "EVOLUTION_GO_BASE_URL ausente"; fi
 if [[ -n "$(value BOT_ADS_AUDIO_FILE)" ]]; then pass "caminho do audio configurado (verificar montagem no container)"; else fail "BOT_ADS_AUDIO_FILE nao configurado"; fi
 if [[ -n "$(value BOT_ADS_DOCUMENT_FILE)" || -n "$(value BOT_ADS_DOCUMENT_URL)" ]]; then pass "fonte do PDF configurada (verificar acesso real no container)"; else fail "PDF nao configurado"; fi
