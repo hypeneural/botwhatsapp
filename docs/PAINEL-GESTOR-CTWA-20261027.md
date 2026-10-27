@@ -11,7 +11,9 @@ A página abre no **Histórico de atendimentos** e traz quatro contadores:
 - **Mensagens recebidas**: eventos na janela atual, não o total de pessoas.
 - **Identificadas como anúncio**: correspondência literal com o gatilho CTWA ou metadado `externalAdReply` / `referral.sourceType=ad`. É um sinal operacional, **não prova independente da Meta**.
 - **Propostas aceitas pelo CRM**: despacho nativo com recibo registrado; **não indica entrega no WhatsApp do segundo número**.
-- **Precisam de atenção**: eventos com recusa pelo CRM ou resultado incerto; conferir antes de qualquer reenvio.
+- **Precisam de atenção**: CRM rejeitou, resultado incerto, bot bloqueou antes de chamar CRM ou lead de anuncio sem etapa/agendamento apos cinco minutos; conferir antes de qualquer reenvio.
+
+A visão agrupada considera **a última tentativa CRM**; um agendamento antigo não encobre uma tentativa recente recusada.
 
 O filtro de origem **Sem marcação de anúncio** não deve ser chamado de "orgânico": anúncios sem metadados conhecidos podem entrar nele. A busca procura nome, telefone, trecho do texto e gatilho **dentro da janela carregada**; selecione 50/150/500 para ampliar. Atualização padrão de 30 segundos, pausa automática quando a aba não está visível.
 
@@ -24,7 +26,9 @@ O bloco **Ver contatos agrupados por telefone** é opcional e só consulta o res
 | Visualização | Interpretação | Próxima decisão |
 |---|---|---|
 | CRM aceitou | Retorno nativo com `dispatch_uuid` | Acompanhar processamento posterior da proposta |
-| CRM rejeitou | Regra/validação recusou, incluindo HTTP 422 legado | Analisar elegibilidade, permissão ou contrato; não reenviar automaticamente |
+| CRM rejeitou | Recusa HTTP real do CRM, incluindo HTTP 422 legado | Analisar elegibilidade, permissão ou contrato; não reenviar automaticamente |
+| Bloqueado antes do CRM | Bot impediu o agendamento localmente (deduplicação, autorização etc.), sem chamada comprovada | Inspecionar guardas internas e histórico antes de qualquer ação |
+| Etapa CRM não registrada | Fluxo de anúncio tem tarefas, mas a etapa CRM ainda não apareceu no journal | Verificar worker e persistência, especialmente se ultrapassou cinco minutos |
 | Resultado incerto | Timeout, 429, 5xx ou resposta inconclusiva | Consultar CRM/provedor antes de qualquer retentativa |
 | Pendente / Em andamento | Tarefa durável não encerrada | Aguardar trabalhador, conferir saúde se persistir |
 | Sem execução registrada | Evento recebido, nenhuma etapa na outbox (pode ser preview, supressão, lacuna histórica) | Consultar registro, não supor mensagem enviada |
