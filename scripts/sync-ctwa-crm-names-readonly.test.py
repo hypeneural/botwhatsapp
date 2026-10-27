@@ -59,7 +59,7 @@ class NamesReadOnlyTest(unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "crm_read.token"
-            path.write_text("17|" + "a" * 40 + "\\n", encoding="utf-8")
+            path.write_text("17|" + "a" * 40 + chr(10), encoding="utf-8")
             os.chmod(path, 0o600)
             self.assertEqual(module.token_from_private_file(path), "17|" + "a" * 40)
             os.chmod(path, 0o644)
