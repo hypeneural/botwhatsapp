@@ -46,6 +46,8 @@ func makePreviewData(dir string, now time.Time) error {
 		{"5548999000003", "Clara (exemplo)", "Quero conhecer os pacotes de Natal em Tijucas", "meta_ads", "crm: HTTP 503 uncertain", core.AdsProposal, outbox.TaskUncertain, now.Add(-42 * time.Minute)},
 		{"5548999000004", "Família (exemplo)", "Bom dia, vocês abrem hoje?", "normal", "", core.Greeting, outbox.TaskConfirmed, now.Add(-78 * time.Minute)},
 		{"5548999000005", "Contato (exemplo)", "Vocês fazem fotos de Ano Novo?", "normal", "", core.Ignore, "", now.Add(-112 * time.Minute)},
+		{"5548999000006", "Sofia (exemplo)", "Quero conhecer os pacotes de Natal em Tijucas", "meta_ads", "lead already claimed in current window", core.AdsProposal, outbox.TaskSuppressed, now.Add(-8 * time.Minute)},
+		{"5548999000007", "Bruna (exemplo)", "Quero conhecer os pacotes de Natal em Tijucas", "meta_ads", "", core.AdsProposal, "", now.Add(-12 * time.Minute)},
 	}
 	for i, c := range cases {
 		// Valid SHA-256 key follows the real outbox filename scheme.
@@ -78,7 +80,8 @@ func makePreviewData(dir string, now time.Time) error {
 		if err := writeJSON(filepath.Join(contactDir, key+".json"), contact); err != nil {
 			return err
 		}
-		if c.action == core.Ignore {
+		if c.action == core.Ignore || c.state == "" {
+			// Also demonstrate received paid traffic without any durable API task.
 			continue
 		}
 		addTask := func(index int, step workflow.Step, state outbox.TaskState, externalID, errorText string) error {
