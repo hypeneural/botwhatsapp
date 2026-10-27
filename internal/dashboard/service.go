@@ -193,6 +193,7 @@ func (s *Service) buildRow(c outbox.ContactState, tasks []outbox.Task, now time.
 
 	// Sort tasks by CreatedAt ascending
 	sort.Slice(tasks, func(i, j int) bool {
+		if tasks[i].CreatedAt.Equal(tasks[j].CreatedAt) { return tasks[i].ID < tasks[j].ID }
 		return tasks[i].CreatedAt.Before(tasks[j].CreatedAt)
 	})
 
@@ -202,6 +203,7 @@ func (s *Service) buildRow(c outbox.ContactState, tasks []outbox.Task, now time.
 	var contactName string
 	var crmScheduleID string
 	var latestTaskTime time.Time
+	var latestCRMTask *outbox.Task
 
 	for _, t := range tasks {
 		if t.ContactName != "" {
@@ -217,20 +219,31 @@ func (s *Service) buildRow(c outbox.ContactState, tasks []outbox.Task, now time.
 			isAds = true
 		}
 
-		// Check CRM status
 		if t.Step == "schedule_natal_crm" {
-			if t.State == outbox.TaskConfirmed && t.ExternalID != "" {
-				crmScheduleID = t.ExternalID
-				row.CRMStatus = fmt.Sprintf("Aceito no CRM (%s)", t.ExternalID)
-			} else if t.State == outbox.TaskUncertain {
-				row.CRMStatus = "Incerto / revisar"
-			} else if t.State == outbox.TaskSuppressed {
-				row.CRMStatus = "Rejeitado / não agendado"
-			} else if t.State == outbox.TaskAttemptStarted {
-				row.CRMStatus = "Em execução"
-			} else if t.State == outbox.TaskPending {
-				row.CRMStatus = "Pendente"
-			}
+			copyTask := t
+			latestCRMTask = &copyTask
+		}
+	}
+
+
+	if latestCRMTask != nil {
+		t := *latestCRMTask
+		switch {
+		case t.State == outbox.TaskConfirmed && t.ExternalID != "":
+			crmScheduleID = t.ExternalID
+			row.CRMStatus = fmt.Sprintf("Aceito no CRM (%s)", t.ExternalID)
+		case t.State == outbox.TaskSuppressed && strings.Contains(strings.ToLower(t.Error), "http "):
+			row.CRMStatus = "CRM recusou o último encaminhamento"
+		case t.State == outbox.TaskSuppressed:
+			row.CRMStatus = "Bot bloqueou o último encaminhamento"
+		case t.State == outbox.TaskUncertain && strings.Contains(strings.ToLower(t.Error), "http 422"):
+			row.CRMStatus = "CRM recusou (HTTP 422 legado)"
+		case t.State == outbox.TaskUncertain, t.State == outbox.TaskAttemptStarted:
+			row.CRMStatus = "Resultado incerto / conferir"
+		case t.State == outbox.TaskPending:
+			row.CRMStatus = "Aguardando execução"
+		default:
+			row.CRMStatus = "Sem confirmação do CRM"
 		}
 	}
 
