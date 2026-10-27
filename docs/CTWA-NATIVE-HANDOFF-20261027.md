@@ -20,6 +20,8 @@ No CRM, `NatalProposalEntryPoint::assertGenericAllowed` proíbe explicitamente 4
 
 ## Painel já existente
 
+> Guia mais recente de UX do gestor e preview local: [PAINEL-GESTOR-CTWA-20261027.md](PAINEL-GESTOR-CTWA-20261027.md). Os rótulos `crm_aceito`/`crm_rejeitado` são internos; a interface exibe linguagem simples, layout de cartões no celular, bloco de contatos opcional e filtros de ação. O leitor do histórico usa cache de no máximo 8 segundos, e não equivale a status em tempo real da Meta ou do segundo WhatsApp.
+
 O bot já expõe `/painel` e `/api/dashboard/contacts`. Nesta PR:
 - Bloquear acesso sem `BOT_DASHBOARD_TOKEN`; exigir Basic Auth HTTPS no navegador, ou header `X-Dashboard-Token` em uso interno. Não usar `?token=` em links.
 - Exibir `Rejeitado / não agendado`, `Incerto / revisar`, `Pendente` ou `Aceito no CRM (proposal-dispatch-UUID)`, sem confundir HTTP 2xx com mensagem recebida.
@@ -28,7 +30,7 @@ O bot já expõe `/painel` e `/api/dashboard/contacts`. Nesta PR:
 ## Execução curta do Antigravity, com restrições
 
 1. Comparar main/head/produção e PR #9. As proteções de telefone da PR #9 já foram incorporadas nesta PR #10; verificar paridade e evitar aplicar duas vezes.
-2. Executar `scripts/validate-ctwa-handoff-local.ps1` uma vez; caso o gofmt falhe, usar `-Format`, revisar diff e repetir. Não confundir script publicado com PASS real.
+2. Executar uma única vez `scripts/validate-ctwa-handoff-local.ps1 -Format -Preview` na worktree isolada: formatação limitada à PR, testes Go, vet, build bot/preview, checagem JS com Node quando disponível, relatório sanitizado e visualização local com dados fictícios. Encerrar demo com Ctrl+C. Não confundir script publicado com PASS real.
 3. Revisar o token do painel e acesso HTTPS privado (sem query secret), e prover Sanctum **com escopo mínimo**. Instância de saída é selecionada pelo agendador nativo do CRM, não pelo `message_instances.id` hardcoded do legado.
 4. Pré-produção: verificar configuração real do 5287, decisão pelo trigger literal, spool e 13 rejeições sem reinicializar/limpar journal. Consultar primeiro o CRM; separar dispatch já existente, rejeição definitiva e incerto. Não fazer replay automático.
 5. Canário **um novo lead autorizado**: receber texto no 5287, observar etapas Evolution, confirmar recibo nativo `dispatch_uuid` e verificar no CRM que a proposta foi de fato agendada. Confirmar processamento posterior pela instância CRM sem inferir entrega a partir de aceite HTTP.
@@ -45,7 +47,7 @@ Os 13 contatos relatados pelo Antigravity em 27/10 tiveram HTTP 422, mas **não 
 - `internal/ingress/audit.go` retém somente tipo, **até 280 caracteres** de texto inbound, sinal contextual de anúncio, gatilho literal e classificação; esses dados possuem PII e devem ficar em diretório 0700, arquivos 0600.
 - Origem `meta_ads` é atribuída quando houve gatilho **exato** ou metadados `externalAdReply`; sem isso o painel classifica `normal` (não equivale a prova da origem orgânica). Não confiar somente no papel Ads da instância.
 - `GET /api/dashboard/events?limit=150` mostra o histórico recente (limite servidor: 500), em ordem de ingresso, com correspondência hash da tarefa da outbox, janela de atendimento BRT, tentativa, retorno/recusa, receipt de Evolution e dispatch UUID do CRM. `/api/dashboard/contacts` continua compatível.
-- `/painel` possui filtros de origem, situação, nome, telefone e trecho de texto, e expansão das etapas. O frontend escapa o conteúdo dos contatos antes de usar HTML; todas as APIs são somente leitura.
+- `/painel` possui visualização prioritária ao gestor com KPIs de atenção, filtros de origem, situação, nome, telefone e trecho de texto, timeline expansível e layout responsivo para celular; resumo de contatos é carregado somente ao expandir. O frontend escapa o conteúdo dos contatos antes de usar HTML; todas as APIs são somente leitura.
 - `BOT_DASHBOARD_TOKEN` é obrigatório. Basic Auth do navegador via HTTPS privado ou `X-Dashboard-Token` de acesso interno. **Nunca `?token=`**, link público ou endpoint sem autenticação.
 - 2xx da Evolution = API aceitou, não é confirmação de entrega/leitura; 200/201 do CRM com `dispatch_uuid` = despacho agendado, não mensagem entregue. `HTTP 422` torna a etapa rejeitada; timeouts/429/5xx permanecem `uncertain` sem replay.
 - Histórico informativo é limitado pelo processo de manutenção (com worker ativo) de seis em seis horas a até 30.000 arquivos e 90 dias. O journal de **etapas** usa retenção separada de até 30 dias e limite de 20.000 tarefas, então registros antigos podem conservar o ingresso mas perder detalhes por etapa. A limpeza **não** remove tasks, eventos de dedupe, contatos, opt-out, claims nem estados `uncertain`. Registros antigos não possuem texto/tipo do ingresso retroativamente.
