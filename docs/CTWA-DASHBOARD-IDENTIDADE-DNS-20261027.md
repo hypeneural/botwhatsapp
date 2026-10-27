@@ -38,7 +38,7 @@ O provedor Evolution Go suporta Info.Sender/SenderAlt como JID alternativo e o c
 - Template conservador: deploy/caddy/bot.etijucas.com.br.caddy.example. É EXEMPLO A SER INTEGRADO ao Caddyfile **existente**, não substitui configurações de outros sites/serviços. Upstream 127.0.0.1:8788 só é correto se Caddy estiver no mesmo namespace do host e a porta estiver no loopback; se Caddy for container, confirmar rede e usar upstream real.
 - Publicar SOMENTE /dashboard, /painel e /api/dashboard/* sob HTTPS; ocultar publicamente /static/* e /webhook/* (Evolution deve continuar na rota interna autorizada). Não expor raw spool ou env. Bot já exige token Basic Auth no painel.
 - Validação DNS / borda read-only: bash scripts/audit-ctwa-dns-readonly.sh 169.58.210.14 APENAS SE comprovado IP WAN; /dashboard, /painel e endpoints JSON exigem 401 sem senha, /static/* deve dar 404.
-- Validação completa por endereço HTTPS depois de Caddy: python3 scripts/audit-ctwa-panel-readonly.py --env /private/.env.production --base-url https://bot.etijucas.com.br. O script inclui credencial Basic no request, por isso só usar APÓS validar domínio e certificado com segurança. Não imprimir secrets no chat.
+- Validação completa por endereço HTTPS depois de Caddy: python3 scripts/audit-ctwa-panel-readonly.py --env /private/.env.production --base-url https://bot.etijucas.com.br --panel-only. O script inclui credencial Basic no request, por isso só usar APÓS validar domínio e certificado com segurança. Não imprimir secrets no chat.
 - Testar Browser real desktop/mobile e menu de contatos, JSON, timezone e filtros. Renderizar nomes e telefones existentes; conferir exemplos comparando com CRM read-only, sem mostrar PII no log.
 
 ## GO/NO-GO
