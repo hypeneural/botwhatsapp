@@ -482,8 +482,8 @@ func (w *Worker) executeScheduleNatal(ctx context.Context, task Task) error {
 		return w.recordSuppressed(task.ID, "crm: operational authorization required before dispatch")
 	}
 
-	// 2. Check explicit CRM instance ID
-	if w.cfg.CRMInstanceID == nil || *w.cfg.CRMInstanceID <= 0 {
+	// 2. Check explicit CRM instance ID for legacy mode only
+	if w.cfg.NativeProposalScheduler == nil && (w.cfg.CRMInstanceID == nil || *w.cfg.CRMInstanceID <= 0) {
 		return w.recordSuppressed(task.ID, "crm: explicit numeric message_instances.id (>0) required")
 	}
 
@@ -501,6 +501,17 @@ func (w *Worker) executeScheduleNatal(ctx context.Context, task Task) error {
 		return w.recordSuppressed(task.ID, "lead already claimed in current window; duplicate campaign dispatch skipped")
 	}
 
+	// 5. Preferred native proposal scheduler: commercial rules, durable dispatch and idempotency remain in CRM.
+	if w.cfg.NativeProposalScheduler != nil {
+		requestID := crm.NativeRequestID(task.ID)
+		dispatchUUID, err := w.cfg.NativeProposalScheduler.ScheduleNative(ctx, task.CRMPhone, requestID)
+		if err != nil {
+			return w.recordUncertain(task.ID, err.Error())
+		}
+		return w.recordConfirmed(task.ID, "proposal-dispatch-"+dispatchUUID)
+	}
+
+	// Legacy campaign endpoint remains for offline compatibility; CRM production rejects 416.
 	// 5. Build CRM request (Default campaign is strictly 416 - Natal 2026 without name)
 	req, err := crm.BuildWithoutName(task.CRMPhone, w.cfg.CRMInstanceID)
 	if err != nil {
