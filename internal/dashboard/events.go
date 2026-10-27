@@ -18,6 +18,7 @@ const maxEventRows = 500
 // record. A confirmed Evolution ID is an API acceptance, NOT a delivered/read
 // WhatsApp receipt. Unknown network outcomes must never be displayed as sent.
 type EventStep struct {
+	startedAt    time.Time
 	TaskID       string `json:"-"`
 	Step         string `json:"step"`
 	Provider     string `json:"provider"`
@@ -320,6 +321,7 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 			continue
 		}
 		step := EventStep{
+			startedAt: t.AttemptStartedAt,
 			TaskID: t.ID,
 			Step:   FriendlyStep(string(t.Step)), Provider: "Evolution Go",
 			State: string(t.State), APIResponse: outcome(t),
@@ -372,7 +374,13 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 			} else if step.State == string(outbox.TaskAttemptStarted) {
 				// An attempt started in the last 2 minutes is active in-flight work, not uncertain!
 				// Only classify as uncertain if stalled without completion for over 2 minutes.
-				if time.Since(row.ReceivedAt) > 2*time.Minute {
+				started := step.startedAt
+				if started.IsZero() {
+					// Legacy tasks missing the attempt timestamp must not be
+					// treated as fresh based only on the webhook time.
+					started = row.ReceivedAt
+				}
+				if time.Since(started) > 2*time.Minute {
 					uncertain = true
 				}
 			}
