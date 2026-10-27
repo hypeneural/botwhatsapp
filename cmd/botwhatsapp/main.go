@@ -49,6 +49,9 @@ func main() {
 	enabled := os.Getenv("BOT_ENABLED") == "true"
 	outboundEnabled := os.Getenv("BOT_OUTBOUND_ENABLED") == "true"
 	opAuth := os.Getenv("BOT_OPERATIONAL_AUTHORIZATION") == "true"
+	if enabled && len(strings.TrimSpace(os.Getenv("BOT_DASHBOARD_TOKEN"))) < 32 {
+		log.Fatal("BOT_ENABLED requires BOT_DASHBOARD_TOKEN with at least 32 characters")
+	}
 	if outboundEnabled && (!enabled || !opAuth) {
 		log.Fatal("outbound must have BOT_ENABLED=true and BOT_OPERATIONAL_AUTHORIZATION=true")
 	}
