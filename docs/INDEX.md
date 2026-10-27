@@ -1,6 +1,7 @@
 # Índice — documentação vigente vs histórico
 
 ## COMEÇAR AQUI (canonical)
+- [Hotfix CTWA 5287 → CRM V4 + histórico auditável](CTWA-NATIVE-HANDOFF-20261027.md): PR #10 Draft, gateway nativo, eventos, recibos, segurança e script offline `scripts/validate-ctwa-handoff-local.ps1`. Fonte operacional atual; não usar API batch 415/416.
 - [CTWA em produção vigente](CTWA-ROUTING-20261022.md): fluxo comercial Meta Ads na instância 25287 (`evydencia`), envio de PDF via URL `/static/`, reação `🎄`, fallback de menu e painel web `/painel`.
 - [Skill CTWA](../.agents/skills/ctwa-ads-funnel/SKILL.md): roteiro local para Antigravity.
 
