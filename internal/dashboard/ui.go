@@ -241,10 +241,10 @@ footer { color: #64756c; font-size: 12px; padding: 12px 2px 0; }
     <div class="metric kpi-leads">
       <div class="heading">
         <svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor"><path d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm1 11.93V14a1 1 0 1 1-2 0v-.07A6.002 6.002 0 0 1 4.07 9H4a1 1 0 1 1 0-2h.07A6.002 6.002 0 0 1 9 4.07V4a1 1 0 1 1 2 0v.07A6.002 6.002 0 0 1 15.93 9H16a1 1 0 1 1 0 2h-.07A6.002 6.002 0 0 1 11 13.93zM10 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg>
-        Leads de Anúncios (CTWA)
+        Mensagens com sinal CTWA
       </div>
       <span class="value" id="kpiAds">—</span>
-      <span class="detail">Gatilho reconhecido ou Meta Ads</span>
+      <span class="detail">Origem indicativa · não representa leads únicos</span>
     </div>
 
     <div class="metric kpi-accepted">
@@ -288,7 +288,7 @@ footer { color: #64756c; font-size: 12px; padding: 12px 2px 0; }
     <div class="priority-bar" role="tablist" aria-label="Filtros prioritários">
       <button type="button" class="tab-chip active" id="tabLeads" data-filter="leads">
         <span class="chip-dot dot-leads"></span>
-        <span>🎯 Leads de Anúncios</span>
+        <span>🎯 Mensagens CTWA</span>
         <span class="chip-count" id="chipLeadsCount">0</span>
       </button>
       <button type="button" class="tab-chip" id="tabAttention" data-filter="attention">
@@ -346,7 +346,7 @@ footer { color: #64756c; font-size: 12px; padding: 12px 2px 0; }
 
     <div class="results-bar">
       <span id="resultCount">Aguardando registros...</span>
-      <span id="activeFilterDesc">Modo: <strong>🎯 Leads de Anúncios</strong> (status e grupos ocultados)</span>
+      <span id="activeFilterDesc">Modo: <strong>🎯 Mensagens CTWA</strong> (status e grupos ocultados)</span>
     </div>
 
     <div class="scroll">
@@ -533,7 +533,7 @@ function renderEvents() {
   const term = $('searchEvents').value.trim().toLocaleLowerCase('pt-BR');
 
   const descriptions = {
-    leads: 'Modo: 🎯 Leads de Anúncios (status e grupos ocultados)',
+    leads: 'Modo: 🎯 Mensagens CTWA (status e grupos ocultados)',
     attention: 'Modo: ⚠️ Precisam de Atenção (rejeições, incertezas ou bloqueios)',
     accepted: 'Modo: ✅ Propostas Agendadas no CRM',
     private: 'Modo: 💬 Todas as Conversas Privadas (status e grupos ocultados)',
