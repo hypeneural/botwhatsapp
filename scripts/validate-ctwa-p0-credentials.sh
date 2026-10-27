@@ -13,7 +13,7 @@ bash -n scripts/preflight-ctwa-production-readonly.sh
 bash -n scripts/preflight-ctwa-production-readonly.test.sh
 bash scripts/preflight-ctwa-production-readonly.test.sh
 if command -v python3 >/dev/null 2>&1; then
-  PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p 'configure-ctwa-secrets.test.py' -v
+  PYTHONDONTWRITEBYTECODE=1 python3 scripts/configure-ctwa-secrets.test.py -v
 else
   echo "NO_GO: python3 ausente para validar o provisionador de credenciais" >&2
   exit 2
