@@ -55,6 +55,8 @@ type EventStats struct {
 	CRMAccepted int `json:"crm_accepted"`
 	CRMRejected int `json:"crm_rejected"`
 	Uncertain   int `json:"uncertain"`
+	Attention   int `json:"attention"`
+	LocalBlocked int `json:"local_blocked"`
 }
 
 // EventResult contains only the most recent N received events, never the full
@@ -262,32 +264,53 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 			// This may be a suppressed greeting, a preview or a historical gap.
 			row.Status = "sem_tarefas"
 		}
-		uncertain := false
-		rejected := false
-		pending := false
+		uncertain, rejected, localBlocked, pending, crmStep := false, false, false, false, false
 		for _, step := range row.Steps {
-			if step.State == "uncertain" || step.State == "attempt_started" {
+			if step.Provider == "Evydência CRM" {
+				crmStep = true
+				if strings.HasPrefix(step.Reason, "HTTP 422:") ||
+					strings.HasPrefix(step.Reason, "HTTP 401:") ||
+					strings.HasPrefix(step.Reason, "HTTP 403:") ||
+					strings.HasPrefix(step.Reason, "HTTP 400:") ||
+					strings.HasPrefix(step.Reason, "HTTP 404:") {
+					rejected = true
+				} else if step.State == string(outbox.TaskSuppressed) {
+					// A local guard may suppress a task BEFORE calling the CRM.
+					localBlocked = true
+				}
+			}
+			if step.State == string(outbox.TaskUncertain) || step.State == string(outbox.TaskAttemptStarted) {
 				uncertain = true
 			}
-			if step.Provider == "Evydência CRM" && (step.State == "suppressed" || strings.HasPrefix(step.Reason, "HTTP 422:")) {
-				rejected = true
-			}
-			if step.State == "pending" {
-				pending = true
-			}
+			if step.State == string(outbox.TaskPending) { pending = true }
 		}
 		switch {
 		case row.CRMReceipt != "":
 			row.Status = "crm_aceito"
 		case rejected:
 			row.Status = "crm_rejeitado"
+		case localBlocked:
+			row.Status = "bloqueado_local"
 		case uncertain:
 			row.Status = "incerto"
 		case pending:
 			row.Status = "pendente"
+		case len(row.Steps) > 0 && row.Decision == string(core.AdsProposal) && !crmStep:
+			row.Status = "crm_nao_registrado"
 		case len(row.Steps) > 0:
 			row.Status = "finalizado_local"
 		}
+		// One-time, grounded triage signal. Reception by itself is not a failure;
+		// allow five minutes for the worker to commit the remaining stages.
+		age := time.Since(row.ReceivedAt)
+		if row.Status == "crm_rejeitado" || row.Status == "incerto" ||
+			row.Status == "bloqueado_local" ||
+			(age > 5*time.Minute && row.Decision == string(core.AdsProposal) &&
+				(row.Status == "sem_tarefas" || row.Status == "crm_nao_registrado" ||
+					row.Status == "pendente" || row.Status == "em_processamento")) {
+			result.Stats.Attention++
+		}
+		if row.Status == "bloqueado_local" { result.Stats.LocalBlocked++ }
 		result.Stats.Received++
 		if row.Source == "meta_ads" {
 			result.Stats.MetaAds++
