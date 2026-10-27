@@ -202,16 +202,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if decision.Action == core.Ignore {
-		// Opt-out is an actionable control event, never silently drop it.
-		if decision.Reason == "opt_out_requires_persistent_suppression" && s.settings.OnDecision != nil {
-			if err := s.settings.OnDecision(decision); err != nil {
-				http.Error(w, "durable suppression unavailable", http.StatusServiceUnavailable)
-				return
-			}
-			w.WriteHeader(http.StatusAccepted)
-			return
-		}
+	// Status callbacks and outbound messages are not inbound conversations.
+	// All identifiable inbound messages, including normal, media-only and
+	// ignored events, are durably journaled for operational traceability.
+	if msgID == "" || (decision.Action == core.Ignore && decision.Reason == "not_new_inbound") {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
@@ -230,7 +224,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	// Persist outbox tasks BEFORE acknowledging the webhook. Never detach this
 	// operation into a goroutine; a crash could otherwise lose an ACKed event.
-	if s.settings.OnDecision != nil {
+	if s.settings.OnDecision != nil && (decision.Action != core.Ignore || decision.Reason == "opt_out_requires_persistent_suppression") {
 		if err := s.settings.OnDecision(decision); err != nil {
 			http.Error(w, "durable outbox unavailable", http.StatusServiceUnavailable)
 			return
@@ -251,9 +245,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	record := struct {
 		Decision   core.Decision `json:"decision"`
+		Inbound    InboundAudit  `json:"inbound"`
+		EventKey   string        `json:"event_key"`
 		ReceivedAt string        `json:"received_at"`
 		Status     string        `json:"status"`
-	}{decision, time.Now().UTC().Format(time.RFC3339Nano), "planned_preview_only"}
+	}{decision, auditInbound(body, decision), hex.EncodeToString(key[:]), time.Now().UTC().Format(time.RFC3339Nano), "received"}
 	if err = json.NewEncoder(tmp).Encode(record); err != nil {
 		http.Error(w, "spool unavailable", 503)
 		return
