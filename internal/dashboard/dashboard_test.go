@@ -37,7 +37,7 @@ func TestFriendlyStep(t *testing.T) {
 	if FriendlyStep("send_ad_reaction") != "Reação Natalina 🎄" {
 		t.Errorf("unexpected step description")
 	}
-	if FriendlyStep("schedule_natal_crm") != "Proposta Natal (CRM)" {
+	if FriendlyStep("schedule_natal_crm") != "Agendamento da proposta no CRM" {
 		t.Errorf("unexpected step description")
 	}
 	if FriendlyStep("send_greeting_text_menu") != "Menu de Opções 1–5" {
