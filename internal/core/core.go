@@ -93,6 +93,11 @@ func Select(e Envelope,c Config) Decision {
  if strings.HasSuffix(chat,"@g.us")||strings.HasSuffix(chat,"@newsletter")||strings.Contains(chat,"broadcast"){d.Reason="non_private_chat";return d}
  // Keep the chat JID for replies. A LID's digits are never a phone number.
  d.ReplyJID=chat
+ // Preserve the self-declared WhatsApp display name on unresolved @lid events.
+ // Do not infer a phone number from the name or from LID digits.
+ name:=strings.TrimSpace(e.Data.Info.PushName)
+ if len([]rune(name))>70 || strings.ContainsAny(name,";\\r\\n") {name=""}
+ d.Name=name
  phone,ok:=JIDPhone(chat)
  if !ok && strings.HasSuffix(chat,"@lid"){
   phone,ok=JIDPhone(e.Data.Info.Sender)
@@ -101,9 +106,6 @@ func Select(e Envelope,c Config) Decision {
  if !ok {d.Reason="unresolved_phone_or_non_private_chat";return d}
  d.PhoneE164=phone
  d.CRMPhone,_=CRMPhone(phone)
- name:=strings.TrimSpace(e.Data.Info.PushName)
- if len([]rune(name))>70 || strings.ContainsAny(name,";\r\n") {name=""}
- d.Name=name
  body:=e.Data.Message.Conversation
  if body=="" {body=e.Data.Message.Extended.Text}
  body=Normalize(body)
