@@ -23,12 +23,9 @@ func NewHandler(dataDir, token string) *Handler {
 
 func (h *Handler) isAuthorized(r *http.Request) bool {
 	if h.token == "" {
-		return true
+		return false
 	}
-	given := r.URL.Query().Get("token")
-	if given == "" {
-		given = r.Header.Get("X-Dashboard-Token")
-	}
+	given := r.Header.Get("X-Dashboard-Token")
 	if given == "" {
 		return false
 	}
@@ -46,6 +43,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	path := r.URL.Path
 
 	switch {
