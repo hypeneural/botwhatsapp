@@ -67,7 +67,7 @@ func FriendlyStep(step string) string {
 	case "send_ad_closing_text":
 		return "Texto de Fechamento"
 	case "schedule_natal_crm":
-		return "Proposta Natal (CRM)"
+		return "Agendamento da proposta no CRM"
 	case "send_greeting_text_menu":
 		return "Menu de Opções 1–5"
 	case "send_menu_reply":
@@ -293,7 +293,7 @@ func (s *Service) buildRow(c outbox.ContactState, tasks []outbox.Task, now time.
 		switch {
 		case t.State == outbox.TaskConfirmed && t.ExternalID != "":
 			crmScheduleID = t.ExternalID
-			row.CRMStatus = fmt.Sprintf("Aceito no CRM (%s)", t.ExternalID)
+			row.CRMStatus = fmt.Sprintf("Agendada no CRM (%s)", t.ExternalID)
 		case t.State == outbox.TaskSuppressed && strings.Contains(strings.ToLower(t.Error), "http "):
 			row.CRMStatus = "CRM recusou o último encaminhamento"
 		case t.State == outbox.TaskSuppressed:
