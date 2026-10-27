@@ -137,14 +137,18 @@ func main() {
 		if id, err := strconv.Atoi(os.Getenv("EVIDENCIA_CRM_OUTBOUND_MESSAGE_INSTANCE_ID")); err == nil && id > 0 {
 			crmInstanceID = &id
 		}
-		if adsUUID != "" && crmInstanceID == nil {
+		nativeToken := strings.TrimSpace(os.Getenv("EVIDENCIA_CRM_PROPOSAL_SANCTUM_TOKEN"))
+		if adsUUID != "" && nativeToken == "" {
+			log.Fatal("ads proposal requires EVIDENCIA_CRM_PROPOSAL_SANCTUM_TOKEN (native CRM endpoint); legacy campaign 416 is blocked")
+		}
+		if adsUUID != "" && nativeToken == "" && crmInstanceID == nil {
 			log.Fatal("ads CRM dispatch requires explicit positive EVIDENCIA_CRM_OUTBOUND_MESSAGE_INSTANCE_ID")
 		}
 		loc, err := time.LoadLocation("America/Sao_Paulo")
 		if err != nil {
 			log.Fatal("America/Sao_Paulo timezone is required for shared CRM claim")
 		}
-		if adsUUID != "" && strings.TrimSpace(os.Getenv("EVIDENCIA_CRM_AUTHORIZATION")) == "" {
+		if adsUUID != "" && nativeToken == "" && strings.TrimSpace(os.Getenv("EVIDENCIA_CRM_AUTHORIZATION")) == "" {
 			log.Fatal("ads campaign requires EVIDENCIA_CRM_AUTHORIZATION")
 		}
 		crmClient := crm.Client{
@@ -199,6 +203,7 @@ func main() {
 			DataDir: dataDir, GreetingCooldown: 24 * time.Hour, AdsFlowCooldown: time.Duration(adsCooldownHours) * time.Hour,
 			CRMInstanceID:            crmInstanceID,
 			OperationalAuthorization: opAuth,
+			NativeProposalScheduler: crm.NativeClient{BaseURL: env("EVIDENCIA_CRM_BASE_URL", "https://evydencia.com"), BearerToken: nativeToken},
 			AdReactionEmoji:          env("BOT_ADS_REACTION_EMOJI", "🎄"),
 			AdAudioFixture:           audio,
 			AdDocumentFixture:        adDoc,
