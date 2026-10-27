@@ -41,7 +41,7 @@ try {
     $created = $user->createToken(
         'botwhatsapp-ctwa-5287-' . gmdate('Ymd'),
         [\App\Support\Extension\ExtensionAbilities::PROPOSAL_WRITE],
-        now()->addDays(30)
+        now()->addDays(90)
     );
     $out = @fopen($outFile, 'x');
     if ($out === false) {
@@ -62,7 +62,7 @@ try {
         throw new RuntimeException('arquivo de token incompleto');
     }
     $id = (int) $created->accessToken->getKey();
-    fwrite(STDOUT, "TOKEN_ISSUED: id={$id} ability=extension:proposal-write expira_em_30_dias private_file=OK (valor oculto)\n");
+    fwrite(STDOUT, "TOKEN_ISSUED: id={$id} ability=extension:proposal-write expira_em_90_dias private_file=OK (valor oculto)\n");
     exit(0);
 } catch (Throwable $e) {
     if ($created !== null) {
