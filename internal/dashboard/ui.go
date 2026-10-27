@@ -276,13 +276,16 @@ function renderEvents() {
   $('eventRows').innerHTML=found.map(e => {
     const label=statusLabels[e.status] || ['Estado não identificado','neutral'];
     const sourceTag=e.source==='meta_ads' ? badge('Indício de anúncio','ads') : badge('Sem marcação de anúncio','normal');
+    const nameSource=e.name_origin==='crm'?'Nome confirmado no CRM':
+      (e.name_origin==='whatsapp'?'Nome informado pelo WhatsApp':'Nome não disponível');
     const message=safe(e.inbound_text || '(texto não registrado)');
     const trigger=e.trigger_matched ?
       '<div class="trigger">Gatilho reconhecido'+(e.trigger_text ? ': '+safe(e.trigger_text) : '')+'</div>' :
       '<div class="sub">Sem gatilho exato'+(e.has_ad_context ? ' · contexto Meta presente' : '')+'</div>';
     return '<tr>'+
       '<td data-label="Recebido"><div class="date">'+safe(e.received_at_brt || 'Data indisponível')+'</div></td>'+
-      '<td data-label="Contato"><div class="cell-main">'+safe(e.name || 'Contato WhatsApp')+'</div>'+
+      '<td data-label="Contato"><div class="cell-main">'+safe(e.name || 'Nome não informado')+'</div>'+
+        '<div class="sub">'+safe(nameSource)+'</div>'+
         '<div class="sub">'+safe(e.phone || 'Telefone não identificado')+'</div><div style="margin-top:7px">'+sourceTag+'</div></td>'+
       '<td data-label="Mensagem / gatilho"><div class="message">'+message+'</div>'+
         '<div class="sub">Tipo: '+safe(e.inbound_type || 'Não informado')+'</div>'+trigger+'</td>'+
