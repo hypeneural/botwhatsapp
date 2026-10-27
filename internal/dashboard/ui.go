@@ -250,10 +250,10 @@ footer { color: #64756c; font-size: 12px; padding: 12px 2px 0; }
     <div class="metric kpi-accepted">
       <div class="heading">
         <svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16zm3.707-9.293a1 1 0 0 0-1.414-1.414L9 10.586 7.707 9.293a1 1 0 0 0-1.414 1.414l2 2a1 1 0 0 0 1.414 0l4-4z" clip-rule="evenodd"/></svg>
-        Propostas Aceitas pelo CRM
+        Propostas Agendadas no CRM
       </div>
       <span class="value" id="kpiAccepted">—</span>
-      <span class="detail">Agendadas com recibo oficial</span>
+      <span class="detail">Registradas no CRM · entrega ainda não comprovada</span>
     </div>
 
     <div class="metric kpi-attention">
@@ -298,7 +298,7 @@ footer { color: #64756c; font-size: 12px; padding: 12px 2px 0; }
       </button>
       <button type="button" class="tab-chip" id="tabAccepted" data-filter="accepted">
         <span class="chip-dot dot-accepted"></span>
-        <span>✅ Propostas aceitas</span>
+        <span>✅ Propostas agendadas</span>
         <span class="chip-count" id="chipAcceptedCount">0</span>
       </button>
       <button type="button" class="tab-chip" id="tabPrivate" data-filter="private">
@@ -327,7 +327,7 @@ footer { color: #64756c; font-size: 12px; padding: 12px 2px 0; }
       <select id="filterStatus" class="select" aria-label="Filtrar situação">
         <option value="all">Todas as situações</option>
         <option value="attention">Precisam de atenção</option>
-        <option value="crm_aceito">CRM aceitou</option>
+        <option value="crm_aceito">CRM agendou</option>
         <option value="crm_rejeitado">CRM rejeitou</option>
         <option value="bloqueado_local">Bot bloqueou antes do CRM</option>
         <option value="crm_nao_registrado">Sem etapa CRM registrada</option>
@@ -435,7 +435,7 @@ function badge(label, kind, icon) {
 }
 
 const statusLabels = {
-  crm_aceito: ['CRM aceitou', 'success'],
+  crm_aceito: ['CRM agendou', 'success'],
   crm_rejeitado: ['CRM rejeitou', 'danger'],
   incerto: ['Resultado incerto', 'danger'],
   pendente: ['Pendente', 'warning'],
@@ -483,13 +483,15 @@ window.copyReceipt = function(text, btn) {
 
 function stepsHTML(steps, status) {
   if (!Array.isArray(steps) || !steps.length) {
-    if (status === 'ignorado') return '<span class="plain-note">Nenhuma etapa necessária (mensagem ignorada)</span>';
-    return '<span class="plain-note">Nenhuma etapa de API registrada</span>';
+    if (status === 'telefone_nao_resolvido') return '<span class="plain-note">Bot bloqueou as chamadas: telefone ainda não confirmado. Nenhuma proposta foi solicitada ao CRM.</span>';
+    if (status === 'ignorado') return '<span class="plain-note">Mensagem ignorada pelas regras do bot. Nenhuma chamada de API comercial foi necessária.</span>';
+    if (status === 'sem_tarefas') return '<span class="plain-note">Evento recebido, sem tarefas duráveis registradas. Conferir journal antes de tentar novamente.</span>';
+    return '<span class="plain-note">Não há tarefas de API vinculadas a este evento.</span>';
   }
   const count = steps.length;
   return '<details class="steps"><summary>' +
     '<svg class="chevron" viewBox="0 0 20 20"><path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/></svg>' +
-    '<span>Ver ' + count + ' etapa(s) executada(s)</span></summary>' +
+    '<span>Ver ' + count + ' etapa(s) registrada(s)</span></summary>' +
     '<ol class="timeline">' +
     steps.map(t => {
       const isCRM = t.provider && t.provider.includes('CRM');
@@ -533,7 +535,7 @@ function renderEvents() {
   const descriptions = {
     leads: 'Modo: 🎯 Leads de Anúncios (status e grupos ocultados)',
     attention: 'Modo: ⚠️ Precisam de Atenção (rejeições, incertezas ou bloqueios)',
-    accepted: 'Modo: ✅ Propostas Aceitas pelo CRM',
+    accepted: 'Modo: ✅ Propostas Agendadas no CRM',
     private: 'Modo: 💬 Todas as Conversas Privadas (status e grupos ocultados)',
     all: 'Modo: 📦 Visão Completa (inclui status arquivados e transmissões)'
   };
@@ -584,8 +586,13 @@ function renderEvents() {
     const nameSource = e.name_origin === 'crm' ? 'Nome confirmado no CRM' :
       (e.name_origin === 'whatsapp' ? 'Nome informado pelo WhatsApp' : 'Nome não disponível');
 
+    // Only form links for validated BR national formats, never from a LID,
+    // arbitrary text, or a prefixed number that could become 5555...
     const rawDigits = String(e.phone || '').replace(/\D/g, '');
-    const phoneDisplay = rawDigits.length >= 10
+    const validNational = /^\d{2}\s*\d{4,5}\s*\d{4}$/.test(
+      String(e.phone || '').replace(/[()\-]/g, ' ').replace(/\s+/g, ' ').trim()
+    ) && (rawDigits.length === 10 || rawDigits.length === 11);
+    const phoneDisplay = validNational
       ? '<a href="https://wa.me/55' + rawDigits + '" target="_blank" rel="noopener noreferrer" class="wa-link" title="Abrir conversa no WhatsApp Web">' +
         '<svg viewBox="0 0 24 24"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm0 18.15c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.19 8.19 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.24-8.24 2.2 0 4.27.86 5.82 2.42a8.18 8.18 0 0 1 2.41 5.83c.01 4.54-3.69 8.23-8.22 8.23z"/></svg>' +
         '<span>' + safe(e.phone) + '</span></a>'
@@ -612,6 +619,8 @@ function renderEvents() {
         '<div class="sub">Tipo: ' + safe(e.inbound_type || 'Não informado') + '</div>' + trigger + '</td>' +
       '<td data-label="Resultado">' + badge(label[0], label[1]) +
         receiptHTML +
+        (e.status === 'crm_aceito' ? '<div class="sub">Despacho registrado, entrega ao cliente não verificada.</div>' : '') +
+        (e.status === 'crm_nao_registrado' ? '<div class="sub">O CRM não tem uma etapa confirmada neste evento; verificar a fila sem reenviar automaticamente.</div>' : '') +
         (e.decision_reason ? '<div class="sub">' + safe(formatReason(e.decision_reason)) + '</div>' : '') + '</td>' +
       '<td data-label="Histórico de APIs">' + stepsHTML(e.steps, e.status) + '</td>' +
       '</tr>';
