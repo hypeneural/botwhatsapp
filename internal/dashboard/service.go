@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -84,7 +85,7 @@ func (s *Service) readCRMNameCache() map[string]string {
 	result := make(map[string]string)
 	path := filepath.Join(s.dataDir, "crm-names-cache.json")
 	info, err := os.Lstat(path)
-	if err != nil || !info.Mode().IsRegular() || info.Size() > (2<<20) || info.Mode().Perm()&0007 != 0 {
+	if err != nil || !info.Mode().IsRegular() || info.Size() > (2<<20) || (runtime.GOOS != "windows" && info.Mode().Perm()&0007 != 0) {
 		return result
 	}
 	raw, err := os.ReadFile(path)
@@ -92,8 +93,8 @@ func (s *Service) readCRMNameCache() map[string]string {
 		return result
 	}
 	var data struct {
-		GeneratedAt time.Time `json:"generated_at"`
-		Names map[string]string `json:"names"`
+		GeneratedAt time.Time         `json:"generated_at"`
+		Names       map[string]string `json:"names"`
 	}
 	if json.Unmarshal(raw, &data) != nil ||
 		data.GeneratedAt.IsZero() || time.Since(data.GeneratedAt) > 48*time.Hour ||
