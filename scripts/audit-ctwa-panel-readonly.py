@@ -19,7 +19,7 @@ import stat
 import sys
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import HTTPBasicAuthHandler, HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 
 class RejectRedirects(HTTPRedirectHandler):
@@ -69,7 +69,7 @@ def request_read(opener, base, path, token=None, method="GET"):
 
 
 def run(base, token):
-    opener = build_opener(RejectRedirects())
+    # Do not forward Authorization through HTTP_PROXY/HTTPS_PROXY by accident.\n    opener = build_opener(ProxyHandler({}), RejectRedirects())
     checks = []
     def check(label, condition):
         checks.append((label, bool(condition)))
