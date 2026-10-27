@@ -58,7 +58,7 @@ type Config struct {
 	AdsFlowCooldown          time.Duration
 	CRMInstanceID            *int
 	OperationalAuthorization bool
-	NativeProposalScheduler NativeProposalScheduler
+	NativeProposalScheduler  NativeProposalScheduler
 	GreetingCaption          string
 	AdReactionEmoji          string
 	AdWelcomeText            string

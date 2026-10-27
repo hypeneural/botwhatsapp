@@ -153,12 +153,12 @@ func main() {
 		if adsUUID != "" && nativeToken == "" {
 			log.Fatal("ads proposal requires EVIDENCIA_CRM_PROPOSAL_SANCTUM_TOKEN (native CRM endpoint); legacy campaign 416 is blocked")
 		}
-		
+
 		loc, err := time.LoadLocation("America/Sao_Paulo")
 		if err != nil {
 			log.Fatal("America/Sao_Paulo timezone is required for shared CRM claim")
 		}
-		
+
 		audio := readAsset("BOT_ADS_AUDIO_FILE")
 		image := readAsset("BOT_GREETING_IMAGE_FILE")
 		adImage := readAsset("BOT_ADS_IMAGE_FILE")
@@ -206,7 +206,7 @@ func main() {
 		cfg := outbox.Config{
 			DataDir: dataDir, GreetingCooldown: 24 * time.Hour, AdsFlowCooldown: time.Duration(adsCooldownHours) * time.Hour,
 			OperationalAuthorization: opAuth,
-			NativeProposalScheduler: crm.NativeClient{BaseURL: env("EVIDENCIA_CRM_BASE_URL", "https://evydencia.com"), BearerToken: nativeToken},
+			NativeProposalScheduler:  crm.NativeClient{BaseURL: env("EVIDENCIA_CRM_BASE_URL", "https://evydencia.com"), BearerToken: nativeToken},
 			AdReactionEmoji:          env("BOT_ADS_REACTION_EMOJI", "🎄"),
 			AdAudioFixture:           audio,
 			AdDocumentFixture:        adDoc,

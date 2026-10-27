@@ -30,22 +30,22 @@ type EventStep struct {
 }
 
 type EventRow struct {
-	EventKey        string      `json:"event_key"`
-	ReceivedAt      time.Time   `json:"received_at"`
-	ReceivedAtBRT   string      `json:"received_at_brt"`
-	Phone           string      `json:"phone"`
-	Name            string      `json:"name"`
-	Source          string      `json:"source"`
-	InboundType     string      `json:"inbound_type"`
-	InboundText     string      `json:"inbound_text,omitempty"`
-	TriggerMatched  bool        `json:"trigger_matched"`
-	TriggerText     string      `json:"trigger_text,omitempty"`
-	HasAdContext    bool        `json:"has_ad_context"`
-	Decision        string      `json:"decision"`
-	DecisionReason  string      `json:"decision_reason,omitempty"`
-	Status          string      `json:"status"`
-	CRMReceipt      string      `json:"crm_receipt,omitempty"`
-	Steps           []EventStep `json:"steps"`
+	EventKey       string      `json:"event_key"`
+	ReceivedAt     time.Time   `json:"received_at"`
+	ReceivedAtBRT  string      `json:"received_at_brt"`
+	Phone          string      `json:"phone"`
+	Name           string      `json:"name"`
+	Source         string      `json:"source"`
+	InboundType    string      `json:"inbound_type"`
+	InboundText    string      `json:"inbound_text,omitempty"`
+	TriggerMatched bool        `json:"trigger_matched"`
+	TriggerText    string      `json:"trigger_text,omitempty"`
+	HasAdContext   bool        `json:"has_ad_context"`
+	Decision       string      `json:"decision"`
+	DecisionReason string      `json:"decision_reason,omitempty"`
+	Status         string      `json:"status"`
+	CRMReceipt     string      `json:"crm_receipt,omitempty"`
+	Steps          []EventStep `json:"steps"`
 }
 
 type EventStats struct {
@@ -67,7 +67,7 @@ type EventResult struct {
 
 type inboundJournal struct {
 	Decision core.Decision `json:"decision"`
-	Inbound struct {
+	Inbound  struct {
 		MessageType  string `json:"message_type"`
 		Text         string `json:"text"`
 		Source       string `json:"source"`
@@ -89,31 +89,37 @@ type eventFile struct {
 // directory scans when multiple managers open the panel simultaneously.
 // Cached results are defensively copied so callers cannot mutate history.
 func (s *Service) GetEvents(limit int) (EventResult, error) {
-	if limit <= 0 {limit=150}
-	if limit > maxEventRows {limit=maxEventRows}
+	if limit <= 0 {
+		limit = 150
+	}
+	if limit > maxEventRows {
+		limit = maxEventRows
+	}
 	s.cacheMu.Lock()
 	defer s.cacheMu.Unlock()
-	if !s.eventCacheAt.IsZero() && time.Since(s.eventCacheAt)<8*time.Second {
-		if result,ok:=s.eventCache[limit];ok {
-			return copyEvents(result),nil
+	if !s.eventCacheAt.IsZero() && time.Since(s.eventCacheAt) < 8*time.Second {
+		if result, ok := s.eventCache[limit]; ok {
+			return copyEvents(result), nil
 		}
 	}
-	if s.eventCache==nil || time.Since(s.eventCacheAt)>=8*time.Second {
-		s.eventCache=make(map[int]EventResult,3)
-		s.eventCacheAt=time.Now()
+	if s.eventCache == nil || time.Since(s.eventCacheAt) >= 8*time.Second {
+		s.eventCache = make(map[int]EventResult, 3)
+		s.eventCacheAt = time.Now()
 	}
-	result,err:=s.getEventsUncached(limit)
-	if err!=nil{return result,err}
-	s.eventCache[limit]=copyEvents(result)
-	return result,nil
+	result, err := s.getEventsUncached(limit)
+	if err != nil {
+		return result, err
+	}
+	s.eventCache[limit] = copyEvents(result)
+	return result, nil
 }
 
 func copyEvents(in EventResult) EventResult {
-	out:=in
-	out.Events=make([]EventRow,len(in.Events))
-	copy(out.Events,in.Events)
-	for i:=range out.Events {
-		out.Events[i].Steps=append([]EventStep(nil),in.Events[i].Steps...)
+	out := in
+	out.Events = make([]EventRow, len(in.Events))
+	copy(out.Events, in.Events)
+	for i := range out.Events {
+		out.Events[i].Steps = append([]EventStep(nil), in.Events[i].Steps...)
 	}
 	return out
 }
@@ -143,7 +149,7 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 		}
 		files = append(files, eventFile{filepath.Join(s.dataDir, entry.Name()), info.ModTime()})
 	}
-	sort.Slice(files, func(i,j int) bool { return files[i].mod.After(files[j].mod) })
+	sort.Slice(files, func(i, j int) bool { return files[i].mod.After(files[j].mod) })
 	if len(files) > limit {
 		files = files[:limit]
 	}
@@ -177,14 +183,14 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 			inboundType = "não registrado (legado)"
 		}
 		row := EventRow{
-			EventKey:key, ReceivedAt:at, ReceivedAtBRT:formatEventBRT(at),
-			Phone:FormatPhone(rec.Decision.PhoneE164), Name:rec.Decision.Name,
-			Source:source, InboundType:inboundType,
-			InboundText:rec.Inbound.Text, TriggerMatched:rec.Inbound.TriggerMatch ||
+			EventKey: key, ReceivedAt: at, ReceivedAtBRT: formatEventBRT(at),
+			Phone: FormatPhone(rec.Decision.PhoneE164), Name: rec.Decision.Name,
+			Source: source, InboundType: inboundType,
+			InboundText: rec.Inbound.Text, TriggerMatched: rec.Inbound.TriggerMatch ||
 				rec.Decision.Action == core.AdsProposal,
-			TriggerText:rec.Inbound.TriggerText, HasAdContext:rec.Inbound.HasAdContext,
-			Decision:string(rec.Decision.Action), DecisionReason:rec.Decision.Reason,
-			Status:"recebido", Steps:make([]EventStep,0),
+			TriggerText: rec.Inbound.TriggerText, HasAdContext: rec.Inbound.HasAdContext,
+			Decision: string(rec.Decision.Action), DecisionReason: rec.Decision.Reason,
+			Status: "recebido", Steps: make([]EventStep, 0),
 		}
 		if row.Phone == "" {
 			row.Phone = "Telefone não resolvido"
@@ -199,7 +205,7 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 			}
 		}
 		byKey[key] = len(result.Events)
-		result.Events = append(result.Events,row)
+		result.Events = append(result.Events, row)
 	}
 	// A single scan of task FILENAMES, with JSON reads only for matching events.
 	tasks, err := os.ReadDir(filepath.Join(s.dataDir, "tasks"))
@@ -227,12 +233,12 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 			continue
 		}
 		step := EventStep{
-			TaskID:t.ID,
-			Step:FriendlyStep(string(t.Step)), Provider:"Evolution Go",
-			State:string(t.State), APIResponse:outcome(t),
-			ExternalID:t.ExternalID, Reason:safeEventReason(t.Error),
-			StartedBRT:formatEventBRT(t.AttemptStartedAt),
-			CompletedBRT:formatEventBRT(t.CompletedAt),
+			TaskID: t.ID,
+			Step:   FriendlyStep(string(t.Step)), Provider: "Evolution Go",
+			State: string(t.State), APIResponse: outcome(t),
+			ExternalID: t.ExternalID, Reason: safeEventReason(t.Error),
+			StartedBRT:   formatEventBRT(t.AttemptStartedAt),
+			CompletedBRT: formatEventBRT(t.CompletedAt),
 		}
 		if t.Step == "schedule_natal_crm" {
 			step.Provider = "Evydência CRM"
@@ -246,10 +252,10 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 	}
 	for i := range result.Events {
 		row := &result.Events[i]
-		sort.Slice(row.Steps,func(a,b int) bool {
+		sort.Slice(row.Steps, func(a, b int) bool {
 			return row.Steps[a].TaskID < row.Steps[b].TaskID
 		})
-		if len(row.Steps)>0 {
+		if len(row.Steps) > 0 {
 			row.Status = "em_processamento"
 		} else if row.Decision != string(core.Ignore) {
 			// Ingress was journaled, but the outbox has no durable stage.
@@ -260,37 +266,51 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 		rejected := false
 		pending := false
 		for _, step := range row.Steps {
-			if step.State=="uncertain" || step.State=="attempt_started" {
-				uncertain=true
+			if step.State == "uncertain" || step.State == "attempt_started" {
+				uncertain = true
 			}
-			if step.Provider=="Evydência CRM" && (step.State=="suppressed" || strings.HasPrefix(step.Reason,"HTTP 422:")) {
-				rejected=true
+			if step.Provider == "Evydência CRM" && (step.State == "suppressed" || strings.HasPrefix(step.Reason, "HTTP 422:")) {
+				rejected = true
 			}
-			if step.State=="pending" { pending=true }
+			if step.State == "pending" {
+				pending = true
+			}
 		}
 		switch {
-		case row.CRMReceipt!="":
-			row.Status="crm_aceito"
+		case row.CRMReceipt != "":
+			row.Status = "crm_aceito"
 		case rejected:
-			row.Status="crm_rejeitado"
+			row.Status = "crm_rejeitado"
 		case uncertain:
-			row.Status="incerto"
+			row.Status = "incerto"
 		case pending:
-			row.Status="pendente"
-		case len(row.Steps)>0:
-			row.Status="finalizado_local"
+			row.Status = "pendente"
+		case len(row.Steps) > 0:
+			row.Status = "finalizado_local"
 		}
 		result.Stats.Received++
-		if row.Source=="meta_ads" {result.Stats.MetaAds++} else {result.Stats.Normal++}
-		if row.Status=="crm_aceito" {result.Stats.CRMAccepted++}
-		if row.Status=="crm_rejeitado" {result.Stats.CRMRejected++}
-		if row.Status=="incerto" {result.Stats.Uncertain++}
+		if row.Source == "meta_ads" {
+			result.Stats.MetaAds++
+		} else {
+			result.Stats.Normal++
+		}
+		if row.Status == "crm_aceito" {
+			result.Stats.CRMAccepted++
+		}
+		if row.Status == "crm_rejeitado" {
+			result.Stats.CRMRejected++
+		}
+		if row.Status == "incerto" {
+			result.Stats.Uncertain++
+		}
 	}
-	return result,nil
+	return result, nil
 }
 
 func formatEventBRT(t time.Time) string {
-	if t.IsZero() {return ""}
+	if t.IsZero() {
+		return ""
+	}
 	return t.In(brtLocation).Format("02/01/2006 15:04:05")
 }
 
@@ -299,12 +319,12 @@ func outcome(t outbox.Task) string {
 	case outbox.TaskConfirmed:
 		return "API aceitou (entrega não comprovada)"
 	case outbox.TaskUncertain, outbox.TaskAttemptStarted:
-		if strings.Contains(strings.ToLower(t.Error),"http 422") {
+		if strings.Contains(strings.ToLower(t.Error), "http 422") {
 			return "API recusou (HTTP 422 legado)"
 		}
 		return "Sem confirmação conclusiva"
 	case outbox.TaskSuppressed:
-		if strings.Contains(strings.ToLower(t.Error),"http ") {
+		if strings.Contains(strings.ToLower(t.Error), "http ") {
 			return "API recusou"
 		}
 		return "Não executada / bloqueada"
@@ -318,16 +338,25 @@ func outcome(t outbox.Task) string {
 func safeEventReason(reason string) string {
 	// Errors from remote providers can contain untrusted content or credentials:
 	// only expose recognized operational classes on the dashboard.
-	lower:=strings.ToLower(reason)
+	lower := strings.ToLower(reason)
 	switch {
-	case strings.Contains(lower,"http 422"): return "HTTP 422: rejeição do contrato/regra comercial"
-	case strings.Contains(lower,"http 401"): return "HTTP 401: autorização recusada"
-	case strings.Contains(lower,"http 403"): return "HTTP 403: permissão insuficiente"
-	case strings.Contains(lower,"http 429"): return "HTTP 429: limite de requisições"
-	case strings.Contains(lower,"cooldown"): return "Cooldown / duplicidade"
-	case strings.Contains(lower,"suppressed"),strings.Contains(lower,"opt-out"),strings.Contains(lower,"human"): return "Supressão ou atendimento humano"
-	case strings.Contains(lower,"invalid"),strings.Contains(lower,"missing"): return "Configuração ou destinatário inválido"
-	case reason=="": return ""
-	default: return "Falha ou resultado não confirmado; consultar log protegido"
+	case strings.Contains(lower, "http 422"):
+		return "HTTP 422: rejeição do contrato/regra comercial"
+	case strings.Contains(lower, "http 401"):
+		return "HTTP 401: autorização recusada"
+	case strings.Contains(lower, "http 403"):
+		return "HTTP 403: permissão insuficiente"
+	case strings.Contains(lower, "http 429"):
+		return "HTTP 429: limite de requisições"
+	case strings.Contains(lower, "cooldown"):
+		return "Cooldown / duplicidade"
+	case strings.Contains(lower, "suppressed"), strings.Contains(lower, "opt-out"), strings.Contains(lower, "human"):
+		return "Supressão ou atendimento humano"
+	case strings.Contains(lower, "invalid"), strings.Contains(lower, "missing"):
+		return "Configuração ou destinatário inválido"
+	case reason == "":
+		return ""
+	default:
+		return "Falha ou resultado não confirmado; consultar log protegido"
 	}
 }

@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"sync"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/hypeneural/botwhatsapp/internal/outbox"
@@ -25,10 +25,10 @@ func init() {
 
 // Service loads and aggregates contact and task information.
 type Service struct {
-	dataDir string
-	cacheMu sync.Mutex
+	dataDir      string
+	cacheMu      sync.Mutex
 	eventCacheAt time.Time
-	eventCache map[int]EventResult
+	eventCache   map[int]EventResult
 }
 
 // NewService creates a new dashboard data service.

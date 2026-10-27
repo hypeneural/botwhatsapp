@@ -195,7 +195,9 @@ func TestManagerPanelResponsiveAndReadOnly(t *testing.T) {
 	req.SetBasicAuth("gestor", "fake-preview-only")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
-	if w.Code != http.StatusOK { t.Fatalf("unexpected status %d", w.Code) }
+	if w.Code != http.StatusOK {
+		t.Fatalf("unexpected status %d", w.Code)
+	}
 	html := w.Body.String()
 	required := []string{
 		"Monitor de mensagens", "Histórico de atendimentos", "Precisam de atenção",
@@ -204,13 +206,19 @@ func TestManagerPanelResponsiveAndReadOnly(t *testing.T) {
 		"/api/dashboard/events", "escapeHTML", // replaced below by safe()
 	}
 	for _, token := range required {
-		if token == "escapeHTML" {token="function safe(value)"}
-		if !strings.Contains(html,token) {t.Errorf("manager page missing %q",token)}
+		if token == "escapeHTML" {
+			token = "function safe(value)"
+		}
+		if !strings.Contains(html, token) {
+			t.Errorf("manager page missing %q", token)
+		}
 	}
 	for _, blocked := range []string{"<script src=", "https://cdn.", "fetch('/api/campaigns/schedule", "?token="} {
-		if strings.Contains(html,blocked) {t.Errorf("unexpected external/write source %q",blocked)}
+		if strings.Contains(html, blocked) {
+			t.Errorf("unexpected external/write source %q", blocked)
+		}
 	}
-	if w.Header().Get("X-Frame-Options")!="DENY" || !strings.Contains(w.Header().Get("Cache-Control"),"no-store") {
+	if w.Header().Get("X-Frame-Options") != "DENY" || !strings.Contains(w.Header().Get("Cache-Control"), "no-store") {
 		t.Fatal("sensitive management dashboard headers missing")
 	}
 }

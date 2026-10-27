@@ -12,12 +12,12 @@ import (
 // categorical ad attribution. Never retain Evolution webhook payloads, tokens,
 // image metadata, media content or request paths in the operational history.
 type InboundAudit struct {
-	MessageType   string `json:"message_type"`
-	Text          string `json:"text,omitempty"`
-	Source        string `json:"source"`
-	HasAdContext  bool   `json:"has_ad_context"`
-	TriggerMatch  bool   `json:"trigger_match"`
-	TriggerText   string `json:"trigger_text,omitempty"`
+	MessageType  string `json:"message_type"`
+	Text         string `json:"text,omitempty"`
+	Source       string `json:"source"`
+	HasAdContext bool   `json:"has_ad_context"`
+	TriggerMatch bool   `json:"trigger_match"`
+	TriggerText  string `json:"trigger_text,omitempty"`
 }
 
 func auditInbound(body []byte, decision core.Decision) InboundAudit {
@@ -25,17 +25,17 @@ func auditInbound(body []byte, decision core.Decision) InboundAudit {
 		Data struct {
 			Message struct {
 				Conversation string `json:"conversation"`
-				Extended struct {
-					Text string `json:"text"`
+				Extended     struct {
+					Text        string `json:"text"`
 					ContextInfo struct {
 						ExternalAdReply json.RawMessage `json:"externalAdReply"`
 					} `json:"contextInfo"`
 				} `json:"extendedTextMessage"`
-				Image json.RawMessage `json:"imageMessage"`
-				Video json.RawMessage `json:"videoMessage"`
-				Audio json.RawMessage `json:"audioMessage"`
-				Document json.RawMessage `json:"documentMessage"`
-				Buttons json.RawMessage `json:"buttonsResponseMessage"`
+				Image       json.RawMessage `json:"imageMessage"`
+				Video       json.RawMessage `json:"videoMessage"`
+				Audio       json.RawMessage `json:"audioMessage"`
+				Document    json.RawMessage `json:"documentMessage"`
+				Buttons     json.RawMessage `json:"buttonsResponseMessage"`
 				ContextInfo struct {
 					ExternalAdReply json.RawMessage `json:"externalAdReply"`
 				} `json:"contextInfo"`
@@ -107,7 +107,7 @@ func isAdReferral(raw json.RawMessage) bool {
 		return false
 	}
 	var meta struct {
-		SourceType string `json:"sourceType"`
+		SourceType    string `json:"sourceType"`
 		SourceTypeAlt string `json:"source_type"`
 	}
 	if json.Unmarshal(raw, &meta) != nil {

@@ -221,6 +221,7 @@ footer{color:#65746b;font-size:12px;padding:12px 2px 0}
 'use strict';
 const state = { events:[], contacts:[], contactsLoaded:false, loading:false, timer:null, lastSuccess:null };
 const $ = id => document.getElementById(id);
+function apiURL(path) { return new URL(path, window.location.origin); }
 function safe(value) {
   return String(value == null ? '' : value).replace(/[&<>"']/g, ch =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -299,7 +300,7 @@ function renderContacts(){
 async function loadContacts(){
   if (state.contactsLoaded) return;
   try {
-    const res=await fetch('/api/dashboard/contacts',{credentials:'same-origin',cache:'no-store'});
+    const res=await fetch(apiURL('/api/dashboard/contacts'),{credentials:'same-origin',cache:'no-store'});
     if(!res.ok) throw new Error('Falha HTTP '+res.status);
     const data=await res.json();
     state.contacts=Array.isArray(data.contacts)?data.contacts:[];
@@ -315,7 +316,7 @@ async function refreshData(){
   $('refreshBtn').disabled=true;
   showStatus('Consultando histórico do bot...',false);
   try {
-    const res=await fetch('/api/dashboard/events?limit='+encodeURIComponent($('pageLimit').value),
+    const res=await fetch(apiURL('/api/dashboard/events?limit='+encodeURIComponent($('pageLimit').value)),
       {credentials:'same-origin',cache:'no-store'});
     if(!res.ok) throw new Error('Falha HTTP '+res.status);
     const data=await res.json();
