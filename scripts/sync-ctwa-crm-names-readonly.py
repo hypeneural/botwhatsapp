@@ -66,6 +66,7 @@ def lookup(opener, phone, token):
     req = Request(url, headers={
         "Authorization": "Bearer " + token,
         "Accept": "application/json",
+        "User-Agent": "BotWhatsApp-Panel/1.0 (CTWA CRM Name Cache)",
     }, method="GET")
     try:
         with opener.open(req, timeout=6) as response:
