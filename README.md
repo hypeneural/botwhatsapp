@@ -1,5 +1,7 @@
 # BotWhatsApp — Estúdio Evidência
 
+> **Hotfix em revisão (PR #10, 27/10/2026):** Ads somente no WhatsApp final **5287**; agendamento Natal pelo endpoint nativo `/api/v1/extension/proposals/schedule`; painel `/painel` com `/api/dashboard/events`, login restrito e histórico por mensagem. A API batch 415/416 tornou-se inválida. Contrato canônico do hotfix: [docs/CTWA-NATIVE-HANDOFF-20261027.md](docs/CTWA-NATIVE-HANDOFF-20261027.md). As seções abaixo são histórico da main em 22/10 e não autorizam deploy.\n
+
 Serviço Go independente para dois workflows do WhatsApp no Estúdio Evidência, integrado à **Evolution Go 0.7.2 instalada** e à **API existente do Evidência CRM**. O número conectado aos anúncios recebe primeiro tratamento CTWA configurável, com saudação genérica se a frase não corresponder. Não modificar o código, banco ou infraestrutura do CRM.
 
 ## Estado em 22/10/2026
@@ -14,8 +16,8 @@ Serviço Go independente para dois workflows do WhatsApp no Estúdio Evidência,
 
 | Canal | WhatsApp | Plataforma e função |
 |---|---|---|
-| Anúncios Meta | **48 3220-0440** | Evolution Go; gatilho literal da campanha, texto e áudio PTT; agenda pelo CRM |
-| Saudação/Menu | **48 99642-5287** | Evolution Go; imagem única com legenda e opções 1–5, cooldown 24h, pausa humana |
+| Anúncios Meta (novo hotfix) | **48 99642-5287** | Evolution Go; gatilho literal + fallback de saudação; proposta nativa no CRM |
+| Saudação/Menu | **5287 no mesmo papel Ads** | Não criar segundo papel Greeting para o mesmo número |
 | Emissor da proposta | Configurado no CRM | Número do CRM escolhido por `message_instances.id` explícito (relato: instância 1), não confundir com a saudação |
 
 O inbound da instância `anderson` tem um webhook ocupado pelo serviço de status. **Nunca apontá-lo diretamente ao bot**, nem ocupar o :8050 ou alterar o status-engine para :8051.
