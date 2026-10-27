@@ -60,3 +60,13 @@ func TestEventEndpointAuthAndLimit(t *testing.T){
 	var result EventResult
 	if err:=json.Unmarshal(w.Body.Bytes(),&result);err!=nil || result.Limit!=500 {t.Fatal(err,result.Limit)}
 }
+
+func TestLegacyHTTP422IsClassifiedAsRejected(t *testing.T) {
+	task:=outbox.Task{State:outbox.TaskUncertain,Error:"crm: HTTP 422 rejected"}
+	if got:=outcome(task);got!="API recusou (HTTP 422 legado)" {
+		t.Fatalf("incorrect historical response: %s",got)
+	}
+	if got:=safeEventReason(task.Error);got!="HTTP 422: rejeição do contrato/regra comercial" {
+		t.Fatalf("incorrect 422 explanation: %s",got)
+	}
+}
