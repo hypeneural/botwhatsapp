@@ -216,7 +216,7 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 			strings.HasSuffix(row.replyJID, "@lid") {
 			row.Status = "telefone_nao_resolvido"
 		}
-		if row.Decision == string(core.Ignore) {
+		if row.Decision == string(core.Ignore) && row.Status != "telefone_nao_resolvido" {
 			row.Status = "ignorado"
 			if row.DecisionReason == "opt_out_requires_persistent_suppression" {
 				row.Status = "opt_out"
