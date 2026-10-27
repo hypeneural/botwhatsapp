@@ -25,6 +25,7 @@ fi
 PYTHONDONTWRITEBYTECODE=1 "${python_cmd[@]}" scripts/configure-ctwa-secrets.test.py -v
 PYTHONDONTWRITEBYTECODE=1 "${python_cmd[@]}" scripts/audit-ctwa-panel-readonly.test.py -v
 PYTHONDONTWRITEBYTECODE=1 "${python_cmd[@]}" scripts/sync-ctwa-crm-names-readonly.test.py -v
+PYTHONDONTWRITEBYTECODE=1 "${python_cmd[@]}" scripts/validate-ctwa-crm-contract.py
 if command -v php >/dev/null 2>&1; then
   php -l scripts/issue-ctwa-sanctum-on-crm.php
   php -l scripts/verify-ctwa-sanctum-on-crm.php
