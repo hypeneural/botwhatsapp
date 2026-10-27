@@ -292,9 +292,9 @@ footer {
       <span class="metric-sub">Atendimento / Menu</span>
     </div>
     <div class="metric-card">
-      <span class="metric-title">📅 Agendamentos CRM 416</span>
+      <span class="metric-title">📅 Propostas aceitas pelo CRM</span>
       <span class="metric-val val-crm" id="metricCRM">—</span>
-      <span class="metric-sub">Propostas confirmadas</span>
+      <span class="metric-sub">Agendamento registrado, entrega não comprovada</span>
     </div>
     <div class="metric-card">
       <span class="metric-title">⏱️ Em Cooldown (24h)</span>
@@ -339,7 +339,7 @@ footer {
       <button class="tab-btn active" onclick="setFilter('all', this)">Todos (<span id="countAll">0</span>)</button>
       <button class="tab-btn" onclick="setFilter('ads', this)">🎯 Meta Ads (<span id="countAds">0</span>)</button>
       <button class="tab-btn" onclick="setFilter('organic', this)">💬 Orgânico (<span id="countOrg">0</span>)</button>
-      <button class="tab-btn" onclick="setFilter('crm', this)">📅 CRM 416 (<span id="countCRM">0</span>)</button>
+      <button class="tab-btn" onclick="setFilter('crm', this)">📅 Propostas CRM (<span id="countCRM">0</span>)</button>
       <button class="tab-btn" onclick="setFilter('cooldown', this)">⏱️ Cooldown (<span id="countCooldown">0</span>)</button>
     </div>
     <div class="search-box">
@@ -368,7 +368,7 @@ footer {
 
   <footer>
     <span>Última sincronização: <strong id="lastSyncTime">—</strong></span>
-    <span>BotWhatsApp Staging &bull; Evydência CRM Read-Only &bull; Evolution Go 0.7.2</span>
+    <span>BotWhatsApp &bull; Histórico local &bull; CRM com API &bull; Evolution Go 0.7.2</span>
   </footer>
 </div>
 
