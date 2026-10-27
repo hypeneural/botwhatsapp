@@ -191,6 +191,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	receivedAt := time.Now().UTC()
 	var msgID string
 	decision, msgID, err = parseAndDecide(body)
 	if err != nil {
@@ -249,7 +250,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		EventKey   string        `json:"event_key"`
 		ReceivedAt string        `json:"received_at"`
 		Status     string        `json:"status"`
-	}{decision, auditInbound(body, decision), hex.EncodeToString(key[:]), time.Now().UTC().Format(time.RFC3339Nano), "received"}
+	}{decision, auditInbound(body, decision), hex.EncodeToString(key[:]), receivedAt.Format(time.RFC3339Nano), "received"}
 	if err = json.NewEncoder(tmp).Encode(record); err != nil {
 		http.Error(w, "spool unavailable", 503)
 		return
