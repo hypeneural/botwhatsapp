@@ -1,5 +1,8 @@
 # Antigravity Flash Lite — tarefa local atual
 
+> **ORDEM ATUAL 27/10/2026 — PR #10:** este texto abaixo é histórico pré-CRM V4. Para a homologação do WhatsApp final 5287 e painel do gestor, leia [PAINEL-GESTOR-CTWA-20261027.md](PAINEL-GESTOR-CTWA-20261027.md) e rode **uma vez** `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate-ctwa-handoff-local.ps1 -Format -Preview` em worktree isolada. O endpoint batch 416 NÃO funciona mais. Não fazer deploy nem envio real; a prévia é exclusivamente fictícia.
+
+
 O projeto já possui worker durável e contratos CRM/GO. O funil CTWA tem múltiplos gatilhos em `config/ads-triggers.txt`, fallback de saudação no número de anúncios, imagem/vídeo opcionais, CRM 416 final. `docs/CTWA-ROUTING-20261022.md` explica as alterações. **Não reimplementar**. Leia `AGENTS.md`, `docs/PRODUCTION-PREFLIGHT-20261022.md`, `docs/RELAY-ROLLOUT-GATES.md`.
 
 1. Conferir `git status -sb` e o commit; preservar alterações locais sem reset destrutivo.
