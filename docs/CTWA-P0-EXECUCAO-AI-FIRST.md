@@ -17,6 +17,15 @@ Escopo: botwhatsapp PR #10, branch fix/ctwa-native-proposal-handoff-20261027. Se
 ## Fase 1 — Avell / Antigravity (sem rede produtiva)
 Na PR #10: git fetch, verificar HEAD/diff, atualizar com fast-forward, sem reset. Rodar gate local já existente scripts/validate-ctwa-handoff-local.ps1 no HEAD final. Para novos scripts, bash scripts/validate-ctwa-p0-credentials.sh executa preflight falso, unittest privado, php -l quando disponível. Não usar -Preview se já homologado o mesmo HTML.
 
+## Identidade e instalacao efetiva confirmadas (27/10)
+- Conector CRM LIVE verificou operador autenticado id=2 com ability extension:proposal-write e recurso de propostas habilitado. A ability NAO substitui a checagem real de can_send_proposals no banco pelo emissor.
+- A arvore de deploy do CRM esta documentada em hypeneural/evydencia-crm/docs/vps-deploy-contract.md: /var/www/evydencia/current apontando para release ativa e /var/www/evydencia/shared/.env. Verificar o symlink e vendor/autoload.php antes de executar o emissor; nunca assumir que bot e CRM ficam no mesmo host.
+- CRM composer.json declara laravel/framework:^10.10 e laravel/sanctum:^3.3. Checar versoes reais no host; referencia oficial: https://laravel.com/docs/10.x/sanctum. createToken(name, abilities, expiresAt) e suportado.
+- O token CRM LIVE atual tem MAIS abilities que o necessario; NAO reutilizar nem extrair o segredo da sessao do MCP. Emitir token separado com ability unica.
+- O provisionador do dashboard pode escrever o segredo e sair com codigo !=0 porque o Sanctum permanece faltando. Esse exit significa NO_GO GLOBAL, nao desfaz a senha gravada. Nao rodar --rotate-dashboard novamente so para corrigir esse exit.
+- Relato do Antigravity de curl e /etc/hosts inconclusivo: repetir apenas verificacao HTTPS/DNS por diagnostico sanitizado, nao inferir rede saudavel pelo retorno do CRM no conector.
+- Ao transferir segredo e aplicar .env, verificar YAML efetivo e overrides. environment do Compose tem precedencia sobre env_file mesmo quando vazio (Docker docs).
+
 ## Fase 2 — segredos privados (sem chat, sem Github)
 Provisionamento de painel NO HOST REAL DO BOT, após verificar qual arquivo .env é efetivo:
 
@@ -33,7 +42,7 @@ Em CRM Laravel REAL autorizado: verificar usuário existente com can_send_propos
   php /private/issue-ctwa-sanctum-on-crm.php /var/www/evydencia/current USER_ID /private/ctwa-sanctum.token
   php /private/verify-ctwa-sanctum-on-crm.php /var/www/evydencia/current /private/ctwa-sanctum.token
 
-Emissor altera APENAS a tabela Sanctum de tokens do CRM, requer usuário com permissão comercial e emite ability mínima com expiração em 30 dias; não muda código, fluxos ou pedidos. Verificador somente lê DB e confirma hash, ability, usuário e validade sem emitir proposta. Exige acesso e identidade de usuário autorizados; se faltar, BLOCKED, não usar token antigo 416.
+Emissor altera APENAS a tabela Sanctum de tokens do CRM, requer usuário com permissão comercial e emite ability mínima com expiração em 90 dias (cobre Natal 2026; revogar após a temporada); não muda código, fluxos ou pedidos. Verificador somente lê DB e confirma hash, ability, usuário e validade sem emitir proposta. Exige acesso e identidade de usuário autorizados; se faltar, BLOCKED, não usar token antigo 416.
 
 Transferir o arquivo com SCP/SSH criptografado em rede privada entre hosts autorizados, chmod 0600. Não passar token em linha de comando, URL, chat, issue ou log. No bot:
 
