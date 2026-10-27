@@ -96,7 +96,7 @@ func Select(e Envelope,c Config) Decision {
  // Preserve the self-declared WhatsApp display name on unresolved @lid events.
  // Do not infer a phone number from the name or from LID digits.
  name:=strings.TrimSpace(e.Data.Info.PushName)
- if len([]rune(name))>70 || strings.ContainsAny(name,";\\r\\n") {name=""}
+ if len([]rune(name))>70 || strings.ContainsAny(name,";\r\n") {name=""}
  d.Name=name
  phone,ok:=JIDPhone(chat)
  if !ok && strings.HasSuffix(chat,"@lid"){
