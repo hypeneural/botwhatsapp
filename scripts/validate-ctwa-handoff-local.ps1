@@ -75,6 +75,7 @@ try {
         "internal/outbox/worker.go",
         "internal/dashboard/events.go",
         "internal/dashboard/events_test.go",
+        "internal/dashboard/forensic_regression_test.go",
         "internal/dashboard/handler.go",
         "internal/dashboard/dashboard_test.go",
         "internal/dashboard/service.go",
@@ -129,6 +130,18 @@ try {
     } else {
         $results.Add("JS syntax: SKIP (Node nao encontrado; teste Go do markup ainda executado)")
         Write-Host "Node ausente. Verificacao JS ignorada; nao reportar como PASS." -ForegroundColor Yellow
+    }
+
+    # The production preflight is simulated with fake secrets only.
+    # Git for Windows often installs bash; missing Bash is a visible SKIP.
+    $bashTool = Get-Command bash -ErrorAction SilentlyContinue
+    if ($bashTool) {
+        Run-Gate "Production preflight contract (fake data)" {
+            & bash scripts/preflight-ctwa-production-readonly.test.sh
+        }
+    } else {
+        $results.Add("Bash preflight: SKIP (bash nao encontrado)")
+        Write-Host "Bash ausente: teste offline do preflight ignorado, nao reportar como PASS." -ForegroundColor Yellow
     }
 
     if ($Race) {
