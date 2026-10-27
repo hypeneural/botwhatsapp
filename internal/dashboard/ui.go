@@ -344,7 +344,7 @@ function setFilter(filter, el) {
 
 async function fetchData() {
   try {
-    const res = await fetch('/api/dashboard/contacts' + window.location.search);
+    const res = await fetch('/api/dashboard/contacts', {credentials: 'same-origin'});
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     currentContacts = data.contacts || [];
