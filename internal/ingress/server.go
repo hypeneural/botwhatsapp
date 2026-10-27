@@ -79,6 +79,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if strings.HasPrefix(r.URL.Path, "/static/") && (r.Method == http.MethodGet || r.Method == http.MethodHead) && s.settings.StaticDir != "" {
+		// Evolution needs access to exact media files by URL, never an asset
+		// directory listing (which would reveal other private media names).
+		assetPath := strings.TrimPrefix(r.URL.Path, "/static/")
+		if assetPath == "" || strings.HasSuffix(assetPath, "/") {
+			http.NotFound(w, r)
+			return
+		}
 		http.StripPrefix("/static/", http.FileServer(http.Dir(s.settings.StaticDir))).ServeHTTP(w, r)
 		return
 	}
