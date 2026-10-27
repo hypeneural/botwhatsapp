@@ -9,6 +9,11 @@ Escopo: botwhatsapp PR #10, branch fix/ctwa-native-proposal-handoff-20261027. Se
 - O token dashboard é segredo aleatório local. O token Sanctum SÓ o Laravel pode emitir e validar para um User já autorizado com can_send_proposals=true e ability extension:proposal-write. Não inferir ability de tamanho ou formato. Nunca gerar Sanctum aleatório.
 - Configuração efetiva do Docker pode vir do Compose environment e sobrescrever env_file, até com string vazia. Editar .env.production não altera container já iniciado. Confirmar sem imprimir valores.
 
+## Protecoes de codigo adicionais desta auditoria
+- internal/crm/native.go: Bearer Sanctum somente para HTTPS evydencia.com (localhost apenas nos testes); URL externa indevida e recusada ANTES de qualquer HTTP. Verificar teste TestNativeBlocksUnapprovedCredentialOrigin.
+- cmd/botwhatsapp/main.go: BOT_ENABLED=true exige BOT_DASHBOARD_TOKEN com no minimo 32 caracteres e encerra inicializacao se ausente. Essa guarda e intencional; nao suprimir para forcar deploy.
+- scripts/preflight-ctwa-production-readonly.sh: verifica formato Sanctum ID|segredo e origem oficial HTTPS, mas NAO prova token emitido no CRM. Para provar token, usar verificador PHP read-only no host Laravel autorizado.
+
 ## Fase 1 — Avell / Antigravity (sem rede produtiva)
 Na PR #10: git fetch, verificar HEAD/diff, atualizar com fast-forward, sem reset. Rodar gate local já existente scripts/validate-ctwa-handoff-local.ps1 no HEAD final. Para novos scripts, bash scripts/validate-ctwa-p0-credentials.sh executa preflight falso, unittest privado, php -l quando disponível. Não usar -Preview se já homologado o mesmo HTML.
 
