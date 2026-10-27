@@ -48,7 +48,7 @@ def token_from_private_file(path: Path):
     if path.is_symlink() or not path.is_file() or stat.S_IMODE(path.stat().st_mode) & 0o077:
         raise ValueError("arquivo da credencial de leitura nao e privado (exigir 0600)")
     value = path.read_text(encoding="utf-8").strip()
-    if not re.fullmatch(r"[1-9][0-9]*\\|[a-zA-Z0-9]{40,}", value):
+    if not re.fullmatch(r"[1-9][0-9]*\|[a-zA-Z0-9]{40,}", value):
         raise ValueError("credencial de leitura nao tem formato Sanctum")
     return value
 
