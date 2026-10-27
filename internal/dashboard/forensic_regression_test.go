@@ -77,7 +77,7 @@ func TestForensicLocalBlockAndStalledAdsAreActionable(t *testing.T){
 	for _,c:=range cases{
 		found:=false
 		for _,e:=range history.Events{
-			if e.Decision!=string(c.action) && c.action==core.Ignore {continue}
+			if e.Decision!=string(c.action) {continue}
 			if len(e.Steps)==0 && c.id!="no-task" && c.id!="normal-no-task" {continue}
 			if len(e.Steps)>0 && c.taskState=="" {continue}
 			if len(e.Steps)>0 && e.Steps[0].State!=string(c.taskState) {continue}
