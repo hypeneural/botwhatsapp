@@ -164,3 +164,30 @@ func TestWebhookRegistryMode(t *testing.T) {
 		t.Fatalf("expected 403 for mismatched instance UUID, got %d", wMismatched.Code)
 	}
 }
+
+
+func TestStaticMediaServesPDFButNeverDirectoryListings(t *testing.T) {
+	assets := t.TempDir()
+	if err := os.WriteFile(filepath.Join(assets, "Proposta_Natal.pdf"), []byte("%PDF-1.7 test-only"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(assets, "private"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	srv, err := New(Settings{SpoolDir: t.TempDir(), StaticDir: assets})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, route := range []string{"/static/", "/static/private/", "/static/private"} {
+		w := httptest.NewRecorder()
+		srv.ServeHTTP(w, httptest.NewRequest(http.MethodGet, route, nil))
+		if w.Code == http.StatusOK {
+			t.Fatalf("directory must not be exposed: %s", route)
+		}
+	}
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/static/Proposta_Natal.pdf", nil))
+	if w.Code != http.StatusOK || !strings.HasPrefix(w.Body.String(), "%PDF-") {
+		t.Fatalf("internal Evolution PDF URL must remain valid: %d", w.Code)
+	}
+}
