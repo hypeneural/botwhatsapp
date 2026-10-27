@@ -41,6 +41,7 @@ jobs:
       - run: python3 scripts/configure-ctwa-secrets.test.py -v
       - run: python3 scripts/audit-ctwa-panel-readonly.test.py -v
       - run: python3 scripts/sync-ctwa-crm-names-readonly.test.py -v
+      - run: python3 scripts/validate-ctwa-crm-contract.py
       - run: bash -n scripts/audit-ctwa-dns-readonly.sh
       # Concurrency guard for the journal, policy updates and webhook fan-out.
       # Runs once per code change; no network calls or production credentials.
