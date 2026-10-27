@@ -220,8 +220,8 @@ func main() {
 			AdClosingText:            adClosing,
 			Tenant:                   env("BOT_TENANT", "estudio-evydencia"),
 			Location:                 loc,
-			TaskRetention:            7 * 24 * time.Hour,
-			MaxTasksCount:            10000,
+			TaskRetention:            30 * 24 * time.Hour,
+			MaxTasksCount:            20000,
 			Senders:                  senders,
 		}
 		if path := os.Getenv("BOT_ADS_IMAGE_CAPTION_FILE"); path != "" {
