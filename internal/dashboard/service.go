@@ -58,11 +58,11 @@ func FriendlyStep(step string) string {
 	case "send_ad_audio":
 		return "Áudio PTT Oficial"
 	case "send_ad_document":
-		return "Proposta PDF Enviada"
+		return "PDF aceito pela Evolution"
 	case "send_ad_closing_text":
 		return "Texto de Fechamento"
 	case "schedule_natal_crm":
-		return "Campanha CRM 416"
+		return "Proposta Natal (CRM)"
 	case "send_greeting_text_menu":
 		return "Menu de Opções 1–5"
 	case "send_menu_reply":
