@@ -78,6 +78,37 @@ func FriendlyStep(step string) string {
 	}
 }
 
+// readCRMNameCache only reads the explicitly generated private cache,
+// never synchronously calls CRM from a dashboard request.
+func (s *Service) readCRMNameCache() map[string]string {
+	result := make(map[string]string)
+	path := filepath.Join(s.dataDir, "crm-names-cache.json")
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() || info.Size() > (2<<20) || info.Mode().Perm()&0007 != 0 {
+		return result
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return result
+	}
+	var data struct {
+		Names map[string]string `json:"names"`
+	}
+	if json.Unmarshal(raw, &data) != nil {
+		return result
+	}
+	for phone, name := range data.Names {
+		trimmed := strings.TrimSpace(name)
+		if !strings.HasPrefix(phone, "55") || (len(phone) != 12 && len(phone) != 13) ||
+			len([]rune(trimmed)) == 0 || len([]rune(trimmed)) > 80 ||
+			strings.ContainsAny(trimmed, ";\\r\\n") {
+			continue
+		}
+		result[phone] = trimmed
+	}
+	return result
+}
+
 // GetSummary inspects contacts and tasks in dataDir to produce an aggregated summary.
 func (s *Service) GetSummary() (Summary, error) {
 	now := time.Now().UTC()
@@ -140,6 +171,32 @@ func (s *Service) GetSummary() (Summary, error) {
 			}
 			row := s.buildRow(c, tasks, now)
 			rows = append(rows, row)
+		}
+	}
+
+	// Enrich contact labels from trustworthy identifiers already present in
+	// local inbound history. The optional CRM name cache is populated by an
+	// independent, rate-limited, read-only tool. Never resolve a LID by its digits.
+	historyNames := make(map[string]string)
+	if events, err := s.GetEvents(500); err == nil {
+		for _, event := range events.Events {
+			if event.phoneE164 != "" && event.Name != "" &&
+				event.Name != "Nome não informado" && event.Name != "Contato WhatsApp" &&
+				historyNames[event.phoneE164] == "" {
+				historyNames[event.phoneE164] = event.Name
+			}
+		}
+	}
+	crmNames := s.readCRMNameCache()
+	for i := range rows {
+		if name := crmNames[rows[i].PhoneRaw]; name != "" {
+			rows[i].Name = name // authoritative, unique CRM customer name
+		} else if rows[i].Name == "Cliente WhatsApp" || rows[i].Name == "" {
+			if name := historyNames[rows[i].PhoneRaw]; name != "" {
+				rows[i].Name = name // WhatsApp PushName: unverified display name
+			} else {
+				rows[i].Name = "Nome não informado"
+			}
 		}
 	}
 
