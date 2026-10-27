@@ -61,3 +61,19 @@ func TestNativeRejectAndUnknownNeverRetry(t *testing.T) {
 		}
 	}
 }
+
+func TestNativeBlocksUnapprovedCredentialOrigin(t *testing.T) {
+	for _, origin := range []string{
+		"https://example.invalid",
+		"https://evydencia.com.attacker.invalid",
+		"https://evydencia.com:8443",
+		"http://evydencia.com",
+		"https://user:pass@evydencia.com",
+	} {
+		client := NativeClient{BaseURL: origin, BearerToken: "sensitive-fixture-only"}
+		_, err := client.ScheduleNative(context.Background(), "4898133288", NativeRequestID("no-network"))
+		if !errors.Is(err, ErrInvalidRequest) {
+			t.Errorf("%s should fail before HTTP request; got %v", origin, err)
+		}
+	}
+}
