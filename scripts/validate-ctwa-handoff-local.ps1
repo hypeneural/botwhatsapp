@@ -32,6 +32,8 @@ $files = @(
     "internal/crm/native_test.go",
     "internal/ingress/audit.go",
     "internal/ingress/audit_test.go",
+    "internal/ingress/maintenance.go",
+    "internal/ingress/maintenance_test.go",
     "internal/ingress/server.go",
     "internal/ingress/server_test.go",
     "internal/outbox/types.go",
