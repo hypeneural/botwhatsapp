@@ -63,3 +63,21 @@ func TestAuditExcerptBoundsAndControls(t *testing.T){
 	out:=auditExcerpt(msg)
 	if len([]rune(out))!=280 || strings.ContainsRune(out,'\x00') {t.Fatal("invalid excerpt",len([]rune(out)))}
 }
+
+func TestMetaReferralWithoutTriggerIsRecordedAsOriginHint(t *testing.T) {
+	input:=[]byte(`{"event":"Message","instanceId":"ads","data":{"Info":{"ID":"referral-1","Chat":"5548999999999@s.whatsapp.net"},"Message":{"conversation":"Oi, tem horário?"},"referral":{"sourceApp":"instagram","sourceType":"ad","sourceID":"private-referral-id"}}}`)
+	envelope,err:=core.Parse(input)
+	if err!=nil {t.Fatal(err)}
+	dec:=core.Select(envelope,core.Config{AdsUUID:"ads", AdsTriggers:[]string{"Quero conhecer os pacotes de Natal em Tijucas"},AdsFallback:true})
+	audit:=auditInbound(input,dec)
+	if dec.Action!=core.Greeting || !audit.HasAdContext || audit.TriggerMatch || audit.Source!="meta_ads" {
+		t.Fatalf("referral hint wrongly classified: action=%s audit=%+v",dec.Action,audit)
+	}
+	raw,_:=json.Marshal(audit)
+	if strings.Contains(string(raw),"private-referral-id") {t.Fatal("referral content must not be retained")}
+}
+func TestEmptyOrUnrelatedReferralIsNotAdvertising(t *testing.T){
+	for _,referral:=range []string{`{}`,`{"sourceType":"contact"}`,`null`} {
+		if isAdReferral([]byte(referral)) {t.Fatalf("false ad attribution for %q",referral)}
+	}
+}
