@@ -26,6 +26,9 @@ func (h *Handler) isAuthorized(r *http.Request) bool {
 		return false
 	}
 	given := r.Header.Get("X-Dashboard-Token")
+	if _, password, ok := r.BasicAuth(); ok {
+		given = password
+	}
 	if given == "" {
 		return false
 	}
@@ -39,7 +42,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !h.isAuthorized(r) {
-		http.Error(w, "unauthorized: dashboard token required", http.StatusUnauthorized)
+		w.Header().Set("WWW-Authenticate", `Basic realm="Evydencia Bot Panel", charset="UTF-8"`)
+		http.Error(w, "unauthorized: dashboard credentials required", http.StatusUnauthorized)
 		return
 	}
 
