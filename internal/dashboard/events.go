@@ -189,8 +189,12 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 		if inboundType == "" {
 			inboundType = "não registrado (legado)"
 		}
+		alias := rec.Decision.LIDAlias
+		if alias == "" {
+			alias = rec.Decision.ReplyJID
+		}
 		row := EventRow{
-			phoneE164: rec.Decision.PhoneE164, replyJID: rec.Decision.ReplyJID,
+			phoneE164: rec.Decision.PhoneE164, replyJID: alias,
 			EventKey: key, ReceivedAt: at, ReceivedAtBRT: formatEventBRT(at),
 			Phone: FormatPhone(rec.Decision.PhoneE164), Name: rec.Decision.Name,
 			Source: source, InboundType: inboundType,
