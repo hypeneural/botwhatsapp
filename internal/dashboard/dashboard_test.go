@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -185,5 +186,31 @@ func TestDashboardServiceAndHandler(t *testing.T) {
 	}
 	if jsonSummary.Stats.TotalContacts != 2 {
 		t.Errorf("JSON API TotalContacts = %d, want 2", jsonSummary.Stats.TotalContacts)
+	}
+}
+
+func TestManagerPanelResponsiveAndReadOnly(t *testing.T) {
+	h := NewHandler(t.TempDir(), "fake-preview-only")
+	req := httptest.NewRequest(http.MethodGet, "/painel", nil)
+	req.SetBasicAuth("gestor", "fake-preview-only")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK { t.Fatalf("unexpected status %d", w.Code) }
+	html := w.Body.String()
+	required := []string{
+		"Monitor de mensagens", "Histórico de atendimentos", "Precisam de atenção",
+		"@media(max-width:700px)", "id=\"eventRows\"", "id=\"filterSource\"",
+		"id=\"filterStatus\"", "id=\"contactsDetails\"",
+		"/api/dashboard/events", "escapeHTML", // replaced below by safe()
+	}
+	for _, token := range required {
+		if token == "escapeHTML" {token="function safe(value)"}
+		if !strings.Contains(html,token) {t.Errorf("manager page missing %q",token)}
+	}
+	for _, blocked := range []string{"<script src=", "https://cdn.", "fetch('/api/campaigns/schedule", "?token="} {
+		if strings.Contains(html,blocked) {t.Errorf("unexpected external/write source %q",blocked)}
+	}
+	if w.Header().Get("X-Frame-Options")!="DENY" || !strings.Contains(w.Header().Get("Cache-Control"),"no-store") {
+		t.Fatal("sensitive management dashboard headers missing")
 	}
 }
