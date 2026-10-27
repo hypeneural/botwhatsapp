@@ -44,6 +44,7 @@ type EventRow struct {
 	Decision       string      `json:"decision"`
 	DecisionReason string      `json:"decision_reason,omitempty"`
 	Status         string      `json:"status"`
+	NeedsAttention bool      `json:"needs_attention"`
 	CRMReceipt     string      `json:"crm_receipt,omitempty"`
 	Steps          []EventStep `json:"steps"`
 }
@@ -308,6 +309,7 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 			(age > 5*time.Minute && row.Decision == string(core.AdsProposal) &&
 				(row.Status == "sem_tarefas" || row.Status == "crm_nao_registrado" ||
 					row.Status == "pendente" || row.Status == "em_processamento")) {
+			row.NeedsAttention = true
 			result.Stats.Attention++
 		}
 		if row.Status == "bloqueado_local" { result.Stats.LocalBlocked++ }
@@ -363,6 +365,10 @@ func safeEventReason(reason string) string {
 	// only expose recognized operational classes on the dashboard.
 	lower := strings.ToLower(reason)
 	switch {
+	case strings.Contains(lower, "http 400"):
+		return "HTTP 400: requisição recusada"
+	case strings.Contains(lower, "http 404"):
+		return "HTTP 404: rota indisponível"
 	case strings.Contains(lower, "http 422"):
 		return "HTTP 422: rejeição do contrato/regra comercial"
 	case strings.Contains(lower, "http 401"):
