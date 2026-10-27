@@ -48,7 +48,7 @@ Os 13 contatos relatados pelo Antigravity em 27/10 tiveram HTTP 422, mas **não 
 - `/painel` possui filtros de origem, situação, nome, telefone e trecho de texto, e expansão das etapas. O frontend escapa o conteúdo dos contatos antes de usar HTML; todas as APIs são somente leitura.
 - `BOT_DASHBOARD_TOKEN` é obrigatório. Basic Auth do navegador via HTTPS privado ou `X-Dashboard-Token` de acesso interno. **Nunca `?token=`**, link público ou endpoint sem autenticação.
 - 2xx da Evolution = API aceitou, não é confirmação de entrega/leitura; 200/201 do CRM com `dispatch_uuid` = despacho agendado, não mensagem entregue. `HTTP 422` torna a etapa rejeitada; timeouts/429/5xx permanecem `uncertain` sem replay.
-- Histórico informativo é limitado pelo processo de manutenção de seis em seis horas a até 30.000 arquivos e 90 dias. A limpeza **não** remove tasks, eventos de dedupe, contatos, opt-out, claims nem estados `uncertain`. Registros antigos não possuem texto/tipo do ingresso retroativamente.
+- Histórico informativo é limitado pelo processo de manutenção (com worker ativo) de seis em seis horas a até 30.000 arquivos e 90 dias. O journal de **etapas** usa retenção separada de até 30 dias e limite de 20.000 tarefas, então registros antigos podem conservar o ingresso mas perder detalhes por etapa. A limpeza **não** remove tasks, eventos de dedupe, contatos, opt-out, claims nem estados `uncertain`. Registros antigos não possuem texto/tipo do ingresso retroativamente.
 - Este painel lê apenas os journals que chegaram a este bot. Não substitui logs da Meta, do Evolution, do CRM ou do serviço Status e não inventa entradas desconhecidas.
 
 ## Validação local oficial em Windows
@@ -69,7 +69,7 @@ A PR #10 incorporou em código `phone_config.go`, `phone_config_test.go`, o `mai
 ## Critérios de aceite
 
 - NOVO lead: recibo `dispatch_uuid` persistido, proposta visível no CRM, sem duplicação, phone normalizado conforme `BrazilMobilePhone`.
-- Rejeição 422 visível e sem novo POST.
+- Rejeição 422 visível e sem novo POST, inclusive registros legados `uncertain` contendo `HTTP 422` (reclassificação apenas de leitura).
 - Timeout preserva `uncertain`; painel não informa sucesso falso.
 - Painel restrito, sem URL token nem HTML não escapado de perfis.
 - Confirmação de que PR #9 corrige 0440/5287 antes da implantação.
