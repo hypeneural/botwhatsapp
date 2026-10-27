@@ -101,7 +101,7 @@ func (s *Service) readCRMNameCache() map[string]string {
 		trimmed := strings.TrimSpace(name)
 		if !strings.HasPrefix(phone, "55") || (len(phone) != 12 && len(phone) != 13) ||
 			len([]rune(trimmed)) == 0 || len([]rune(trimmed)) > 80 ||
-			strings.ContainsAny(trimmed, ";\\r\\n") {
+			strings.ContainsAny(trimmed, ";\r\n") {
 			continue
 		}
 		result[phone] = trimmed
