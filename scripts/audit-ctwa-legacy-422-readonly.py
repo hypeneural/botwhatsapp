@@ -39,8 +39,12 @@ def audit(spool: Path):
             confirmed_by_phone.add(phone)
         if state in ("uncertain", "attempt_started") and phone:
             uncertain_by_phone.add(phone)
-        if "http 422" in err and ("native_entry_required" in err or "campaign" in err):
+        # Legacy spool may preserve only "crm: HTTP 422 rejected". Count all
+        # rejected proposal tasks first, without assuming their root cause.
+        if "http 422" in err:
             counts["historical_422_candidate_tasks"] += 1
+            if "native_entry_required" in err:
+                counts["native_entry_signature_confirmed_in_spool"] += 1
             if phone:
                 historical.add(phone)
             else:
