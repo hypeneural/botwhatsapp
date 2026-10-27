@@ -217,7 +217,11 @@ func (s *Service) buildRow(c outbox.ContactState, tasks []outbox.Task, now time.
 		if t.Step == "schedule_natal_crm" {
 			if t.State == outbox.TaskConfirmed && t.ExternalID != "" {
 				crmScheduleID = t.ExternalID
-				row.CRMStatus = fmt.Sprintf("Agendado (%s)", t.ExternalID)
+				row.CRMStatus = fmt.Sprintf("Aceito no CRM (%s)", t.ExternalID)
+			} else if t.State == outbox.TaskUncertain {
+				row.CRMStatus = "Incerto / revisar"
+			} else if t.State == outbox.TaskSuppressed {
+				row.CRMStatus = "Bloqueado / não agendado"
 			} else if t.State == outbox.TaskAttemptStarted {
 				row.CRMStatus = "Em execução"
 			} else if t.State == outbox.TaskPending {
