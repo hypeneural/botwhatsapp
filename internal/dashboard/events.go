@@ -85,10 +85,42 @@ type eventFile struct {
 	mod  time.Time
 }
 
-// GetEvents reads a bounded sample of the newest durable ingress records,
-// and only loads tasks whose event_key is in that sample. It never makes HTTP
-// requests and cannot enqueue/redo any external side effects.
+// GetEvents uses a short 8-second shared snapshot to avoid repeated full
+// directory scans when multiple managers open the panel simultaneously.
+// Cached results are defensively copied so callers cannot mutate history.
 func (s *Service) GetEvents(limit int) (EventResult, error) {
+	if limit <= 0 {limit=150}
+	if limit > maxEventRows {limit=maxEventRows}
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+	if !s.eventCacheAt.IsZero() && time.Since(s.eventCacheAt)<8*time.Second {
+		if result,ok:=s.eventCache[limit];ok {
+			return copyEvents(result),nil
+		}
+	}
+	if s.eventCache==nil || time.Since(s.eventCacheAt)>=8*time.Second {
+		s.eventCache=make(map[int]EventResult,3)
+		s.eventCacheAt=time.Now()
+	}
+	result,err:=s.getEventsUncached(limit)
+	if err!=nil{return result,err}
+	s.eventCache[limit]=copyEvents(result)
+	return result,nil
+}
+
+func copyEvents(in EventResult) EventResult {
+	out:=in
+	out.Events=make([]EventRow,len(in.Events))
+	copy(out.Events,in.Events)
+	for i:=range out.Events {
+		out.Events[i].Steps=append([]EventStep(nil),in.Events[i].Steps...)
+	}
+	return out
+}
+
+// getEventsUncached reads the newest ingress records, then joins only task
+// files with matching event keys. All calls are read-only.
+func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 	if limit <= 0 {
 		limit = 150
 	}
