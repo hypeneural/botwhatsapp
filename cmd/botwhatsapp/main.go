@@ -326,6 +326,9 @@ func main() {
 					if _, err := worker.PruneCompleted(); err != nil {
 						log.Printf("outbox maintenance unavailable: %T", err)
 					}
+					if _, err := ingress.PruneHistory(dataDir, 90*24*time.Hour, 30000); err != nil {
+						log.Printf("ingress history maintenance unavailable: %T", err)
+					}
 				}
 			}
 		}()
