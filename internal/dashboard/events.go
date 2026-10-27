@@ -38,6 +38,7 @@ type EventRow struct {
 	ReceivedAtBRT  string      `json:"received_at_brt"`
 	Phone          string      `json:"phone"`
 	Name           string      `json:"name"`
+	NameOrigin     string      `json:"name_origin,omitempty"`
 	Source         string      `json:"source"`
 	InboundType    string      `json:"inbound_type"`
 	InboundText    string      `json:"inbound_text,omitempty"`
@@ -269,6 +270,21 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 		if row.DecisionReason == "unresolved_phone_or_non_private_chat" &&
 			row.Status == "telefone_nao_resolvido" && row.phoneE164 != "" {
 			row.Status = "ignorado"
+		}
+	}
+	// CRM cache is a separate, rate-limited read-only snapshot keyed by full,
+	// confirmed E.164 number. A CRM-confirmed name supersedes a WhatsApp nickname,
+	// but an unresolved LID never triggers a lookup or guessed association.
+	crmNames := s.readCRMNameCache()
+	for i := range result.Events {
+		row := &result.Events[i]
+		if name := crmNames[row.phoneE164]; name != "" {
+			row.Name = name
+			row.NameOrigin = "crm"
+		} else if row.Name != "" && row.Name != "Nome não informado" {
+			row.NameOrigin = "whatsapp"
+		} else {
+			row.NameOrigin = "indisponivel"
 		}
 	}
 	// A single scan of task FILENAMES, with JSON reads only for matching events.
