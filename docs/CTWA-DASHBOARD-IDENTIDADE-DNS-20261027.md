@@ -12,11 +12,12 @@
 
 ## Correções na PR #10 (NÃO presumir em produção)
 1. Core guarda PushName saneado mesmo em @lid não resolvido, mas NUNCA infere telefone com dígitos do LID.
-2. Eventos mostram "Número oculto pelo WhatsApp (LID)" com estado visível "Telefone pendente de identificação"; tentam associação somente por identidade @lid EXATA já vinculada a E.164 em outro evento carregado; conflitos ficam sem resolução, não reenviam ao CRM.
-3. Serviço de contatos prioriza nome cadastrado no CRM, quando comprovado pela consulta GET read-only com correspondência UNICA; senão, usa PushName associado a número verificável, senão "Nome não informado". Sem associar pelo nome, sem consulta por sufixo de telefone.
-4. scripts/sync-ctwa-crm-names-readonly.py preenche cache privado 0600 de nomes a partir de GET /api/v1/extension/customer-context?phone=DDD+numero e somente status lookup=matched. Ability necessária extension:customer-read. A credencial Sanctum compartilhada da extensão contém essa ability no caso consultado, mas **um token só proposal-write retornaria 403**: nesse caso bloquear enriquecimento, NÃO modificar CRM nem privilegiar o token.
-5. A cache é lida apenas pelo painel de contatos e expira após 48 horas; CLI tem limite máximo de 100 consultas por rodada, padrão 40, sem imprimir nomes/telefones. Execute no host real do bot, nunca na recepção e nunca contra o CRM de escrita. Uma rodada só lê os nomes disponíveis para até 40 contatos ainda não verificados; reexecutar com intervalo suficiente para respeitar throttle do CRM.
-6. Os arquivos da PR foram preparados SEM restart do worker/Compose nem edição do CRM; preserva spool, claims e opt-outs.
+2. O Core preserva também o alias @lid explícito vindo de Info.Sender/Info.SenderAlt, mesmo quando a Evolution troca Chat pelo JID telefônico; nunca usa dígitos do LID como telefone.
+3. Eventos mostram "Número oculto pelo WhatsApp (LID)" com estado visível "Telefone pendente de identificação"; tentam associação somente por identidade @lid EXATA já vinculada a E.164 em outro evento carregado; conflitos ficam sem resolução, não reenviam ao CRM.
+4. Serviço de contatos prioriza nome cadastrado no CRM, quando comprovado pela consulta GET read-only com correspondência UNICA; senão, usa PushName associado a número verificável, senão "Nome não informado". Sem associar pelo nome, sem consulta por sufixo de telefone.
+5. scripts/sync-ctwa-crm-names-readonly.py preenche cache privado 0600 de nomes a partir de GET /api/v1/extension/customer-context?phone=DDD+numero e somente status lookup=matched. Ability necessária extension:customer-read. A credencial Sanctum compartilhada da extensão contém essa ability no caso consultado, mas **um token só proposal-write retornaria 403**: nesse caso bloquear enriquecimento, NÃO modificar CRM nem privilegiar o token.
+6. A cache é lida apenas pelo painel de contatos e expira após 48 horas; CLI tem limite máximo de 100 consultas por rodada, padrão 40, sem imprimir nomes/telefones. Execute no host real do bot, nunca na recepção e nunca contra o CRM de escrita. Uma rodada só lê os nomes disponíveis para até 40 contatos ainda não verificados; reexecutar com intervalo suficiente para respeitar throttle do CRM.
+7. Os arquivos da PR foram preparados SEM restart do worker/Compose nem edição do CRM; preserva spool, claims e opt-outs.
 
 ## Usar scripts existentes, NO-GO até validar
 Dentro de checkout atualizado para PR #10, no host do bot:
