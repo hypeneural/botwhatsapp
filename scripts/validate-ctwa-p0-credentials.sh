@@ -20,6 +20,7 @@ else
 fi
 if command -v php >/dev/null 2>&1; then
   php -l scripts/issue-ctwa-sanctum-on-crm.php
+  php -l scripts/verify-ctwa-sanctum-on-crm.php
 else
   echo "SKIP: PHP lint so pode ser comprovado no host CRM autorizado"
 fi
