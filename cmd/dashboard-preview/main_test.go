@@ -19,8 +19,9 @@ func TestSyntheticPreviewIsReadOnlyAndHasStatuses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(data.Events) != 5 || data.Stats.MetaAds != 3 || data.Stats.Normal != 2 ||
-		data.Stats.CRMAccepted != 1 || data.Stats.CRMRejected != 1 || data.Stats.Uncertain != 1 {
+	if len(data.Events) != 7 || data.Stats.MetaAds != 5 || data.Stats.Normal != 2 ||
+		data.Stats.CRMAccepted != 1 || data.Stats.CRMRejected != 1 || data.Stats.Uncertain != 1 ||
+		data.Stats.LocalBlocked != 1 || data.Stats.Attention != 4 {
 		t.Fatalf("preview regression: total=%d stats=%+v", len(data.Events), data.Stats)
 	}
 	h := dashboard.NewHandler(dir, "demo-local")
