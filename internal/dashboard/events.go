@@ -219,6 +219,10 @@ func (s *Service) GetEvents(limit int) (EventResult, error) {
 		})
 		if len(row.Steps)>0 {
 			row.Status = "em_processamento"
+		} else if row.Decision != string(core.Ignore) {
+			// Ingress was journaled, but the outbox has no durable stage.
+			// This may be a suppressed greeting, a preview or a historical gap.
+			row.Status = "sem_tarefas"
 		}
 		uncertain := false
 		rejected := false
@@ -227,7 +231,7 @@ func (s *Service) GetEvents(limit int) (EventResult, error) {
 			if step.State=="uncertain" || step.State=="attempt_started" {
 				uncertain=true
 			}
-			if step.Provider=="Evydência CRM" && step.State=="suppressed" {
+			if step.Provider=="Evydência CRM" && (step.State=="suppressed" || strings.HasPrefix(step.Reason,"HTTP 422:")) {
 				rejected=true
 			}
 			if step.State=="pending" { pending=true }
@@ -263,6 +267,9 @@ func outcome(t outbox.Task) string {
 	case outbox.TaskConfirmed:
 		return "API aceitou (entrega não comprovada)"
 	case outbox.TaskUncertain, outbox.TaskAttemptStarted:
+		if strings.Contains(strings.ToLower(t.Error),"http 422") {
+			return "API recusou (HTTP 422 legado)"
+		}
 		return "Sem confirmação conclusiva"
 	case outbox.TaskSuppressed:
 		if strings.Contains(strings.ToLower(t.Error),"http ") {
