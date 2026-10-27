@@ -159,7 +159,8 @@ func TestDashboardServiceAndHandler(t *testing.T) {
 	}
 
 	// 2. Authorized HTML request
-	reqAuth := httptest.NewRequest(http.MethodGet, "/painel?token=secret-token-123", nil)
+	reqAuth := httptest.NewRequest(http.MethodGet, "/painel", nil)
+	reqAuth.SetBasicAuth("operador", "secret-token-123")
 	wAuth := httptest.NewRecorder()
 	handler.ServeHTTP(wAuth, reqAuth)
 	if wAuth.Code != http.StatusOK {
@@ -170,7 +171,8 @@ func TestDashboardServiceAndHandler(t *testing.T) {
 	}
 
 	// 3. Authorized JSON API request
-	reqJSON := httptest.NewRequest(http.MethodGet, "/api/dashboard/contacts?token=secret-token-123", nil)
+	reqJSON := httptest.NewRequest(http.MethodGet, "/api/dashboard/contacts", nil)
+	reqJSON.SetBasicAuth("operador", "secret-token-123")
 	wJSON := httptest.NewRecorder()
 	handler.ServeHTTP(wJSON, reqJSON)
 	if wJSON.Code != http.StatusOK {
