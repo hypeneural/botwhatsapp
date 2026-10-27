@@ -328,6 +328,10 @@ let currentContacts = [];
 let activeFilter = 'all';
 let refreshTimer = null;
 
+function escapeHTML(value) {
+  return String(value == null ? "" : value).replace(/[&<>"\x27]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","\x27":"&#39;"}[ch]));
+}
+
 function getInitials(name) {
   if (!name || name === "Cliente WhatsApp") return "📱";
   const parts = name.trim().split(" ");
@@ -405,7 +409,9 @@ function renderTable() {
     
     let crmBadge = '<span class="badge badge-crm-none">—</span>';
     if (c.crm_schedule_id) {
-      crmBadge = '<span class="badge badge-crm-done">✅ Agendado (' + c.crm_schedule_id + ')</span>';
+      crmBadge = '<span class="badge badge-crm-done">✅ Aceito no CRM (' + escapeHTML(c.crm_schedule_id) + ')</span>';
+    } else if (c.is_ads && (c.crm_status === "Incerto / revisar" || c.crm_status === "Rejeitado / não agendado")) {
+      crmBadge = '<span class="badge badge-cooldown">⚠️ ' + escapeHTML(c.crm_status) + '</span>';
     } else if (c.is_ads && c.crm_status === "Pendente") {
       crmBadge = '<span class="badge badge-cooldown">⏳ Pendente</span>';
     }
@@ -425,14 +431,14 @@ function renderTable() {
       '<td class="time-col">' + (c.last_interaction_brt || '—') + '</td>' +
       '<td>' +
         '<div class="lead-info">' +
-          '<div class="avatar ' + avatarClass + '">' + getInitials(c.name) + '</div>' +
-          '<div class="lead-name">' + (c.name || 'Cliente WhatsApp') + '</div>' +
+          '<div class="avatar ' + avatarClass + '">' + escapeHTML(getInitials(c.name)) + '</div>' +
+          '<div class="lead-name">' + escapeHTML(c.name || 'Cliente WhatsApp') + '</div>' +
         '</div>' +
       '</td>' +
-      '<td><strong>' + c.phone_formatted + '</strong></td>' +
+      '<td><strong>' + escapeHTML(c.phone_formatted) + '</strong></td>' +
       '<td>' + channelBadge + '</td>' +
       '<td>' + crmBadge + '</td>' +
-      '<td>' + c.last_step + '</td>' +
+      '<td>' + escapeHTML(c.last_step) + '</td>' +
       '<td>' + statusBadges.join(' ') + '</td>' +
     '</tr>';
   }).join('');
