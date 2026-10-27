@@ -1,6 +1,7 @@
 # Índice — documentação vigente vs histórico
 
 ## COMEÇAR AQUI (canonical)
+- [Gates P0 de implantação real somente do bot](RELEASE-BOT-CTWA-5287-20261027.md): inventário Contabo, preflight privado sem segredos, backup do journal, um worker/canário e rollback do binário. **Não usar Compose staging.**
 - [Painel do gestor (mobile + preview local)](PAINEL-GESTOR-CTWA-20261027.md): filtros compreensíveis, recibos, significado dos estados e homologação visual offline de 5 cenários. Fluxo recomendado para gestor e Antigravity.
 - [Hotfix CTWA 5287 → CRM V4 + histórico auditável](CTWA-NATIVE-HANDOFF-20261027.md): PR #10 Draft, gateway nativo, eventos, recibos, segurança e script offline `scripts/validate-ctwa-handoff-local.ps1`. Fonte operacional atual; não usar API batch 415/416.
 - [CTWA em produção vigente](CTWA-ROUTING-20261022.md): fluxo comercial Meta Ads na instância 25287 (`evydencia`), envio de PDF via URL `/static/`, reação `🎄`, fallback de menu e painel web `/painel`.
