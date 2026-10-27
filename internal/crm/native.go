@@ -43,6 +43,9 @@ func (c NativeClient) preflight() (string, error) {
 	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" ||
 		u.Fragment != "" || u.Path != "" || (u.Scheme != "https" && u.Scheme != "http") ||
 		(u.Scheme == "http" && u.Hostname() != "localhost" && u.Hostname() != "127.0.0.1" && u.Hostname() != "::1") ||
+		(u.Scheme == "https" && u.Hostname() != "evydencia.com" &&
+			u.Hostname() != "localhost" && u.Hostname() != "127.0.0.1" && u.Hostname() != "::1") ||
+		(u.Scheme == "https" && u.Hostname() == "evydencia.com" && u.Port() != "" && u.Port() != "443") ||
 		strings.TrimSpace(c.BearerToken) == "" || strings.TrimSpace(c.BearerToken) != c.BearerToken ||
 		strings.ContainsAny(c.BearerToken, "\r\n") {
 		return "", ErrInvalidRequest
