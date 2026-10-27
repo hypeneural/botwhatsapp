@@ -33,6 +33,9 @@ Atenção: cache gravada no host deve ser lida pelo mesmo diretório montado no 
 ### Nome e telefone não devem ser inventados
 O provedor Evolution Go suporta Info.Sender/SenderAlt como JID alternativo e o changelog descreve troca LID/telefone; consultar versao EFETIVA instalada e amostras redigidas. Se faltar telefone, nunca usar dígitos do LID como WhatsApp/CRMPhone. Não editar journal histórico para fabricar eventos, não buscar contatos por coincidência de nome nem fazer POST comercial para descobrir identidade.
 
+### Contagem forense de identificadores (sem PII)
+`python3 scripts/audit-ctwa-identities-readonly.py --spool /var/lib/docker/volumes/botwhatsapp-stage_botwhatsapp_data/_data` informa quantos eventos tinham E.164 confirmado, @lid não resolvido, PushName presente e quantos @lid possuem mapeamento histórico por alias exato. Não imprime nomes, telefones, LID nem edita journal. Com arquivos legados sem alias, a contagem recuperável é apenas um limite inferior.
+
 ## DNS e HTTPS
 - DNS desejado: bot.etijucas.com.br A 169.58.210.14 CONFORME print; confirmar que o registro FOI SALVO e que este é o IP público REAL da VPS antes de executar mudanças.
 - Caddy automático HTTPS exige DNS correto e portas 80/443 conforme documentação oficial: https://caddyserver.com/docs/quick-starts/https
