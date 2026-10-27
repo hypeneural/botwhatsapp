@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 	"strings"
 	"time"
 
@@ -25,6 +26,9 @@ func init() {
 // Service loads and aggregates contact and task information.
 type Service struct {
 	dataDir string
+	cacheMu sync.Mutex
+	eventCacheAt time.Time
+	eventCache map[int]EventResult
 }
 
 // NewService creates a new dashboard data service.
