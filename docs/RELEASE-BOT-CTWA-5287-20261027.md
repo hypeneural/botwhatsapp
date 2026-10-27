@@ -20,7 +20,7 @@
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate-ctwa-handoff-local.ps1 -Format -Preview
 ```
 
-O script verifica branch/SHA, normaliza **somente** os Go da PR, Go Test, Vet, build, sintaxe JS e, se Git Bash existir, executa simulação offline de preflight de produção com segredos fictícios. Se Bash/Node não existirem, o resultado é **SKIP explícito**, não PASS. Encerrar preview com Ctrl+C; preservar diff local para revisão antes de push. Registrar `git status --short`, SHA, gate, screenshots reais do preview e resultado em 390px. Não substituir o histórico de produção por dados de demo.
+O script verifica branch/SHA, normaliza **somente** os Go da PR, Go Test, Vet, build, sintaxe JS e, se Git Bash existir, executa simulação offline de preflight de produção com segredos fictícios. Se Bash/Node não existirem, o resultado é **SKIP explícito**, não PASS. Encerrar preview com Ctrl+C; preservar diff local para revisão antes de push. Registrar `git status --short`, SHA, gate, screenshots do preview dos **sete cenários fictícios**, incluindo bloqueio local e lead sem tarefa, e resultado em 390px. Não substituir o histórico de produção por dados de demo.
 
 ### Gate B — inventário read-only na Contabo
 
