@@ -108,6 +108,7 @@ func (r *Registry) ResolveSlug(slug string)(Definition,error){
 func (r *Registry) Decide(e core.Envelope) (core.Decision,error){
  d,err:=r.ResolveUUID(e.InstanceID);if err!=nil{return core.Decision{},err}
  var cfg core.Config
+ cfg.BusinessPhoneE164=d.BusinessPhoneE164
  switch d.Role{
  case Ads:
   cfg.AdsUUID=d.InstanceUUID
