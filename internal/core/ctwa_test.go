@@ -18,9 +18,9 @@ func TestRealisticCTWAAndAdsFallback(t *testing.T){
    t.Fatalf("ad webhook not recognized: %+v",got)
  }
  e.Data.Message.Extended.Text="Boa tarde, quanto custa?"
- if got:=Select(e,cfg);got.Action!=Greeting{t.Fatalf("unmatched should greet: %+v",got)}
+ if got:=Select(e,cfg);got.Action!=Ignore||got.Reason!="ads_unmatched_no_automation"{t.Fatalf("unmatched CTWA must not greet: %+v",got)}
  e.Data.Message.Extended.Text="5"
- if got:=Select(e,cfg);got.Action!=MenuOption||got.Option!="5"{t.Fatal("menu on ads phone",got)}
+ if got:=Select(e,cfg);got.Action!=Ignore{t.Fatal("menu on ads phone requires explicit human choice, no unsolicited automation",got)}
  e.Data.Info.Chat="123456789@lid";e.Data.Info.Sender="";e.Data.Info.SenderAlt="567891@lid"
  e.Data.Message.Extended.Text="Quero conhecer os pacotes do Primeiro Natal em Tijucas"
  if got:=Select(e,cfg);got.Action!=Ignore{t.Fatal("LID is not a number",got)}
