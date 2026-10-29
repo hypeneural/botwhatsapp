@@ -17,6 +17,19 @@ func TestSameBusinessPhoneNeverSchedulesEvenIfDirectionIsWrong(t *testing.T) {
 	}
 }
 
+func TestVerifiedBusinessSenderBeatsIncorrectFromMeFlag(t *testing.T) {
+	cfg:=Config{AdsUUID:"ads",BusinessPhoneE164:"5548996425287",
+		AdsTriggers:[]string{"Quero conhecer os pacotes de Natal em Tijucas"}}
+	e:=fixture("ads","5548999991000@s.whatsapp.net",
+		"Quero conhecer os pacotes de Natal em Tijucas","outbound-flag-wrong")
+	e.Data.Info.Sender="5548996425287@s.whatsapp.net"
+	e.Data.Info.IsFromMe=false
+	got:=Select(e,cfg)
+	if got.Action!=OutboundObserved||got.PhoneE164!="5548999991000"{
+		t.Fatalf("self sender must never cause commercial proposal: %+v",got)
+	}
+}
+
 func TestAdsPhoneNeverGreetsOrganicOrMenuEvenWithLegacyFlag(t *testing.T) {
 	cfg:=Config{AdsUUID:"ads",BusinessPhoneE164:"5548996425287",
 		AdsTriggers:[]string{"Quero conhecer os pacotes de Natal em Tijucas"}, AdsFallback:true}
