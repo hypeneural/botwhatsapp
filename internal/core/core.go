@@ -121,7 +121,11 @@ func Select(e Envelope,c Config) Decision {
  }
  d.PhoneE164=phone
  d.CRMPhone,_=CRMPhone(phone)
- if e.Data.Info.IsFromMe {
+ // Some provider callbacks can report the outbound sender even when the
+ // IsFromMe flag is inconsistent. An explicitly verified sender JID equal
+ // to this instance's official line is outbound evidence, never a lead.
+ senderPhone,senderVerified:=JIDPhone(e.Data.Info.Sender)
+ if e.Data.Info.IsFromMe || (senderVerified && senderPhone==c.BusinessPhoneE164 && c.BusinessPhoneE164!="") {
   // Outbound activity is a suppressor for future automatic greetings.
   // Never enqueue a reply or a CRM proposal from the echo itself.
   d.Action=OutboundObserved
