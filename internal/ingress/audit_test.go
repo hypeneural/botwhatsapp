@@ -96,7 +96,7 @@ func TestMetaReferralWithoutTriggerIsRecordedAsOriginHint(t *testing.T) {
 	}
 	dec := core.Select(envelope, core.Config{AdsUUID: "ads", AdsTriggers: []string{"Quero conhecer os pacotes de Natal em Tijucas"}, AdsFallback: true})
 	audit := auditInbound(input, dec)
-	if dec.Action != core.Greeting || !audit.HasAdContext || audit.TriggerMatch || audit.Source != "meta_ads" {
+	if dec.Action != core.Ignore || !audit.HasAdContext || audit.TriggerMatch || audit.Source != "meta_ads" {
 		t.Fatalf("referral hint wrongly classified: action=%s audit=%+v", dec.Action, audit)
 	}
 	raw, _ := json.Marshal(audit)
