@@ -33,6 +33,44 @@
 | Tarefa de saudação enfileirada seguida de mensagem de saída do estúdio | Tarefa suprimida antes do provider I/O |
 | Bot de anúncios e saudação CRM conectados à mesma linha | Auditar origem exata; NÃO criar segunda saudação automática no bot |
 
+## Descoberta independente LIVE: Z-API não notifica mensagens enviadas pelo estúdio
+
+Em **29/10/2026 às 09:52 BRT**, `zapi_instancia_diagnostico` (escopo
+`perfil_dispositivo`, exclusivamente leitura) confirmou uma instância
+Z-API conectada ao número oficial terminado em **5287**. Na verificação
+read-only `assinatura_configuracoes`, o provedor retornou:
+
+```text
+connected = true
+sent_by_me_enabled = false
+```
+
+Esse último estado é **compatível com a causa de saudações indevidas
+originadas no CRM**, já que o `WhatsappConversationStateService` precisa
+receber `ReceivedCallback.fromMe=true` para registrar o atendimento
+iniciado pelo próprio WhatsApp/operador. A ausência da notificação
+significa que o CRM pode não enxergar essas saídas; não é evidência de
+bug no bloqueio de 120h do código PHP.
+
+Documentação oficial do provedor:
+https://z-api-docs.vercel.app/en/webhooks/update-notify-sent-by-me
+A flag `notifySentByMe=true` habilita callback para mensagens
+enviadas pelo número (quando o webhook de recebimento está configurado).
+**NÃO ativar cegamente em produção.** Verificar primeiro o roteamento
+atual de ReceivedCallback, processamento idempotente de mensagens
+`fromMe`, carga esperada, diferença de mensagens enviadas pela API
+versus celular/WhatsApp Web, e testes de canário controlados. Nenhuma
+chave, URL privada ou nome/telefone de cliente deve ir ao Git/chat.
+O CRM `WhatsappHookService`/`WhatsappConversationStateService` deve
+ser inspecionado em modo somente leitura. Se a configuração for
+aprovada, fazer UMA alteração específica da Z-API e testar recebimento
+`fromMe=true` sem disparar automação de saudação, junto com rollback.
+
+Importante: o bot Evolution Go e a Z-API usam a mesma linha comercial,
+mas isso **não comprova** que ambos recebem os mesmos webhooks. Cada
+sistema tem estado de saudação próprio; os guards do bot não substituem
+a notificação de saída necessária ao CRM.
+
 ## Pontos ainda pendentes de prova real
 
 - O status de CI prova regressões e compilação, **não** que `fromMe` chega para mensagens do WhatsApp Web ou CRM por outra conexão. Verificar em amostras **sanitizadas** do webhook, sem nomes/telefones/tokens.
