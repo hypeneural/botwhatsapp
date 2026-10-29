@@ -327,6 +327,8 @@ footer { color: #64756c; font-size: 12px; padding: 12px 2px 0; }
       <select id="filterStatus" class="select" aria-label="Filtrar situação">
         <option value="all">Todas as situações</option>
         <option value="attention">Precisam de atenção</option>
+        <option value="atendimento_manual">Meta Ads: atendimento humano</option>
+        <option value="conversa_organica">Conversa comum (sem automação)</option>
         <option value="crm_aceito">CRM agendou</option>
         <option value="crm_rejeitado">CRM rejeitou</option>
         <option value="bloqueado_local">Bot bloqueou antes do CRM</option>
@@ -445,6 +447,8 @@ const statusLabels = {
   crm_nao_registrado: ['Etapa CRM não registrada', 'warning'],
   finalizado_local: ['Atendimento local finalizado', 'neutral'],
   ignorado: ['Ignorado', 'neutral'],
+  atendimento_manual: ['Meta Ads: atendimento humano', 'warning'],
+  conversa_organica: ['Conversa comum · sem bot', 'neutral'],
   opt_out: ['Contato pediu para parar', 'warning'],
   telefone_nao_resolvido: ['Telefone pendente de identificação', 'warning'],
   recebido: ['Recebido', 'neutral']
@@ -458,6 +462,8 @@ function formatReason(code) {
     case 'unknown_instance': return 'Instância do WhatsApp não configurada';
     case 'no_text': return 'Mídia recebida sem legenda / texto';
     case 'opt_out_requires_persistent_suppression': return 'Contato pediu para parar (opt-out)';
+    case 'ads_unmatched_no_automation': return 'Mensagem fora dos gatilhos CTWA; nenhuma automação iniciada';
+    case 'own_business_number': return 'Número oficial do próprio estúdio; envio bloqueado';
     default: return code || '';
   }
 }
@@ -485,6 +491,8 @@ function stepsHTML(steps, status) {
   if (!Array.isArray(steps) || !steps.length) {
     if (status === 'telefone_nao_resolvido') return '<span class="plain-note">Bot bloqueou as chamadas: telefone ainda não confirmado. Nenhuma proposta foi solicitada ao CRM.</span>';
     if (status === 'ignorado') return '<span class="plain-note">Mensagem ignorada pelas regras do bot. Nenhuma chamada de API comercial foi necessária.</span>';
+    if (status === 'atendimento_manual') return '<span class="plain-note">Origem de anúncio indicada, mas sem frase aprovada. Nenhum envio automático; equipe pode atender normalmente.</span>';
+    if (status === 'conversa_organica') return '<span class="plain-note">Conversa normal: bot não enviou saudação nem proposta.</span>';
     if (status === 'sem_tarefas') return '<span class="plain-note">Evento recebido, sem tarefas duráveis registradas. Conferir journal antes de tentar novamente.</span>';
     return '<span class="plain-note">Não há tarefas de API vinculadas a este evento.</span>';
   }
