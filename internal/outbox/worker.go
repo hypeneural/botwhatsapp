@@ -77,6 +77,22 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
+	// Evolution Go echoes studio-originated messages as IsFromMe. Persist only
+	// contact activity (never queue a reply, greeting or CRM proposal). The
+	// callback is also relevant when staff starts a conversation manually.
+	if d.Action == core.OutboundObserved {
+		if d.PhoneE164 == "" {
+			return nil
+		}
+		now := time.Now().UTC()
+		_, err := w.store.UpdateContact(d.PhoneE164, func(c *ContactState) error {
+			c.LastOutboundAt = now
+			c.LastActivityAt = now
+			return nil
+		})
+		return err
+	}
+
 	// 1. If reason is opt-out suppression, record it immediately and stop.
 	if d.Reason == "opt_out_requires_persistent_suppression" {
 		if d.PhoneE164 == "" {
@@ -88,6 +104,26 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 			return nil
 		})
 		return err
+	}
+
+	// Read state BEFORE updating the inbound activity: this distinguishes
+	// the beginning of a genuinely fresh conversation from the next message
+	// inside one already being served by a person or another automation.
+	var prior ContactState
+	if d.PhoneE164 != "" {
+		var err error
+		prior, err = w.store.GetContact(d.PhoneE164)
+		if err != nil {
+			return fmt.Errorf("outbox: cannot read conversation activity: %w", err)
+		}
+		now := time.Now().UTC()
+		if _, err = w.store.UpdateContact(d.PhoneE164, func(c *ContactState) error {
+			c.LastInboundAt = now
+			c.LastActivityAt = now
+			return nil
+		}); err != nil {
+			return fmt.Errorf("outbox: cannot persist inbound activity: %w", err)
+		}
 	}
 
 	if d.Action == core.Ignore {
@@ -112,10 +148,15 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 		return nil
 	}
 
-	// 4. Greeting cooldown check
+	// 4. A greeting is permitted only at the start of a conversation after
+	// FIVE DAYS of inactivity. A studio-initiated WhatsApp conversation must
+	// not be interrupted with a menu when the customer replies.
 	if d.Action == core.Greeting {
-		if !workflow.IsGreetingDue(contact.LastGreetingAt, time.Now().UTC(), w.cfg.GreetingCooldown, contact.HumanPaused) {
-			// Cooldown not elapsed: suppress greeting
+		now := time.Now().UTC()
+		const quietWindow = 5 * 24 * time.Hour
+		if (!prior.LastActivityAt.IsZero() && now.Before(prior.LastActivityAt.Add(quietWindow))) ||
+			(!prior.LastOutboundAt.IsZero() && now.Before(prior.LastOutboundAt.Add(quietWindow))) ||
+			!workflow.IsGreetingDue(contact.LastGreetingAt, now, w.cfg.GreetingCooldown, contact.HumanPaused) {
 			return nil
 		}
 	}
@@ -311,6 +352,15 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 			return w.recordUncertain(task.ID, "ads cooldown/contact policy persistence unavailable")
 		}
 	}
+	// Recheck the own-message watermark immediately before an external
+	// greeting send. A manual outbound can arrive after a greeting was queued.
+	if task.Step == workflow.SendGreetingImage || task.Step == workflow.SendGreetingText {
+		if !contact.LastOutboundAt.IsZero() &&
+			!time.Now().UTC().After(contact.LastOutboundAt.Add(5*24*time.Hour)) {
+			return w.recordSuppressed(task.ID, "studio conversation active; greeting disabled")
+		}
+	}
+
 	// Sender routing is strict when multiple instances are configured.
 	// Missing sender means suppress/fail closed, never use another account's key.
 	sender := w.evolution
@@ -482,8 +532,8 @@ func (w *Worker) executeScheduleNatal(ctx context.Context, task Task) error {
 		return w.recordSuppressed(task.ID, "crm: operational authorization required before dispatch")
 	}
 
-	// 2. Check explicit CRM instance ID
-	if w.cfg.CRMInstanceID == nil || *w.cfg.CRMInstanceID <= 0 {
+	// 2. Check explicit CRM instance ID for legacy mode only
+	if w.cfg.NativeProposalScheduler == nil && (w.cfg.CRMInstanceID == nil || *w.cfg.CRMInstanceID <= 0) {
 		return w.recordSuppressed(task.ID, "crm: explicit numeric message_instances.id (>0) required")
 	}
 
@@ -501,6 +551,20 @@ func (w *Worker) executeScheduleNatal(ctx context.Context, task Task) error {
 		return w.recordSuppressed(task.ID, "lead already claimed in current window; duplicate campaign dispatch skipped")
 	}
 
+	// 5. Preferred native proposal scheduler: commercial rules, durable dispatch and idempotency remain in CRM.
+	if w.cfg.NativeProposalScheduler != nil {
+		requestID := crm.NativeRequestID(task.ID)
+		dispatchUUID, err := w.cfg.NativeProposalScheduler.ScheduleNative(ctx, task.CRMPhone, requestID)
+		if err != nil {
+			if errors.Is(err, crm.ErrRejected) {
+				return w.recordSuppressed(task.ID, err.Error())
+			}
+			return w.recordUncertain(task.ID, err.Error())
+		}
+		return w.recordConfirmed(task.ID, "proposal-dispatch-"+dispatchUUID)
+	}
+
+	// Legacy campaign endpoint remains for offline compatibility; CRM production rejects 416.
 	// 5. Build CRM request (Default campaign is strictly 416 - Natal 2026 without name)
 	req, err := crm.BuildWithoutName(task.CRMPhone, w.cfg.CRMInstanceID)
 	if err != nil {

@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/hypeneural/botwhatsapp/internal/outbox"
@@ -24,7 +26,10 @@ func init() {
 
 // Service loads and aggregates contact and task information.
 type Service struct {
-	dataDir string
+	dataDir      string
+	cacheMu      sync.Mutex
+	eventCacheAt time.Time
+	eventCache   map[int]EventResult
 }
 
 // NewService creates a new dashboard data service.
@@ -58,11 +63,11 @@ func FriendlyStep(step string) string {
 	case "send_ad_audio":
 		return "Áudio PTT Oficial"
 	case "send_ad_document":
-		return "Proposta PDF Enviada"
+		return "PDF aceito pela Evolution"
 	case "send_ad_closing_text":
 		return "Texto de Fechamento"
 	case "schedule_natal_crm":
-		return "Campanha CRM 416"
+		return "Agendamento da proposta no CRM"
 	case "send_greeting_text_menu":
 		return "Menu de Opções 1–5"
 	case "send_menu_reply":
@@ -72,6 +77,40 @@ func FriendlyStep(step string) string {
 	default:
 		return step
 	}
+}
+
+// readCRMNameCache only reads the explicitly generated private cache,
+// never synchronously calls CRM from a dashboard request.
+func (s *Service) readCRMNameCache() map[string]string {
+	result := make(map[string]string)
+	path := filepath.Join(s.dataDir, "crm-names-cache.json")
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() || info.Size() > (2<<20) || (runtime.GOOS != "windows" && info.Mode().Perm()&0007 != 0) {
+		return result
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return result
+	}
+	var data struct {
+		GeneratedAt time.Time         `json:"generated_at"`
+		Names       map[string]string `json:"names"`
+	}
+	if json.Unmarshal(raw, &data) != nil ||
+		data.GeneratedAt.IsZero() || time.Since(data.GeneratedAt) > 48*time.Hour ||
+		time.Until(data.GeneratedAt) > 5*time.Minute {
+		return result
+	}
+	for phone, name := range data.Names {
+		trimmed := strings.TrimSpace(name)
+		if !strings.HasPrefix(phone, "55") || (len(phone) != 12 && len(phone) != 13) ||
+			len([]rune(trimmed)) == 0 || len([]rune(trimmed)) > 80 ||
+			strings.ContainsAny(trimmed, ";\r\n") {
+			continue
+		}
+		result[phone] = trimmed
+	}
+	return result
 }
 
 // GetSummary inspects contacts and tasks in dataDir to produce an aggregated summary.
@@ -139,6 +178,32 @@ func (s *Service) GetSummary() (Summary, error) {
 		}
 	}
 
+	// Enrich contact labels from trustworthy identifiers already present in
+	// local inbound history. The optional CRM name cache is populated by an
+	// independent, rate-limited, read-only tool. Never resolve a LID by its digits.
+	historyNames := make(map[string]string)
+	if events, err := s.GetEvents(500); err == nil {
+		for _, event := range events.Events {
+			if event.phoneE164 != "" && event.Name != "" &&
+				event.Name != "Nome não informado" && event.Name != "Contato WhatsApp" &&
+				historyNames[event.phoneE164] == "" {
+				historyNames[event.phoneE164] = event.Name
+			}
+		}
+	}
+	crmNames := s.readCRMNameCache()
+	for i := range rows {
+		if name := crmNames[rows[i].PhoneRaw]; name != "" {
+			rows[i].Name = name // authoritative, unique CRM customer name
+		} else if rows[i].Name == "Cliente WhatsApp" || rows[i].Name == "" {
+			if name := historyNames[rows[i].PhoneRaw]; name != "" {
+				rows[i].Name = name // WhatsApp PushName: unverified display name
+			} else {
+				rows[i].Name = "Nome não informado"
+			}
+		}
+	}
+
 	// 4. Sort rows by LastInteraction descending (most recent first)
 	sort.Slice(rows, func(i, j int) bool {
 		return rows[i].LastInteraction.After(rows[j].LastInteraction)
@@ -189,6 +254,9 @@ func (s *Service) buildRow(c outbox.ContactState, tasks []outbox.Task, now time.
 
 	// Sort tasks by CreatedAt ascending
 	sort.Slice(tasks, func(i, j int) bool {
+		if tasks[i].CreatedAt.Equal(tasks[j].CreatedAt) {
+			return tasks[i].ID < tasks[j].ID
+		}
 		return tasks[i].CreatedAt.Before(tasks[j].CreatedAt)
 	})
 
@@ -198,6 +266,7 @@ func (s *Service) buildRow(c outbox.ContactState, tasks []outbox.Task, now time.
 	var contactName string
 	var crmScheduleID string
 	var latestTaskTime time.Time
+	var latestCRMTask *outbox.Task
 
 	for _, t := range tasks {
 		if t.ContactName != "" {
@@ -213,16 +282,30 @@ func (s *Service) buildRow(c outbox.ContactState, tasks []outbox.Task, now time.
 			isAds = true
 		}
 
-		// Check CRM status
 		if t.Step == "schedule_natal_crm" {
-			if t.State == outbox.TaskConfirmed && t.ExternalID != "" {
-				crmScheduleID = t.ExternalID
-				row.CRMStatus = fmt.Sprintf("Agendado (%s)", t.ExternalID)
-			} else if t.State == outbox.TaskAttemptStarted {
-				row.CRMStatus = "Em execução"
-			} else if t.State == outbox.TaskPending {
-				row.CRMStatus = "Pendente"
-			}
+			copyTask := t
+			latestCRMTask = &copyTask
+		}
+	}
+
+	if latestCRMTask != nil {
+		t := *latestCRMTask
+		switch {
+		case t.State == outbox.TaskConfirmed && t.ExternalID != "":
+			crmScheduleID = t.ExternalID
+			row.CRMStatus = fmt.Sprintf("Agendada no CRM (%s)", t.ExternalID)
+		case t.State == outbox.TaskSuppressed && strings.Contains(strings.ToLower(t.Error), "http "):
+			row.CRMStatus = "CRM recusou o último encaminhamento"
+		case t.State == outbox.TaskSuppressed:
+			row.CRMStatus = "Bot bloqueou o último encaminhamento"
+		case t.State == outbox.TaskUncertain && strings.Contains(strings.ToLower(t.Error), "http 422"):
+			row.CRMStatus = "CRM recusou (HTTP 422 legado)"
+		case t.State == outbox.TaskUncertain, t.State == outbox.TaskAttemptStarted:
+			row.CRMStatus = "Resultado incerto / conferir"
+		case t.State == outbox.TaskPending:
+			row.CRMStatus = "Aguardando execução"
+		default:
+			row.CRMStatus = "Sem confirmação do CRM"
 		}
 	}
 
@@ -230,7 +313,7 @@ func (s *Service) buildRow(c outbox.ContactState, tasks []outbox.Task, now time.
 	if isAds {
 		row.Channel = "Meta Ads"
 	} else {
-		row.Channel = "Orgânico"
+		row.Channel = "Sem marcação de anúncio"
 	}
 
 	if contactName == "" {

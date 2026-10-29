@@ -4,6 +4,7 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -23,11 +24,11 @@ func NewHandler(dataDir, token string) *Handler {
 
 func (h *Handler) isAuthorized(r *http.Request) bool {
 	if h.token == "" {
-		return true
+		return false
 	}
-	given := r.URL.Query().Get("token")
-	if given == "" {
-		given = r.Header.Get("X-Dashboard-Token")
+	given := r.Header.Get("X-Dashboard-Token")
+	if _, password, ok := r.BasicAuth(); ok {
+		given = password
 	}
 	if given == "" {
 		return false
@@ -36,13 +37,19 @@ func (h *Handler) isAuthorized(r *http.Request) bool {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "private, no-store")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; connect-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	if !h.isAuthorized(r) {
-		http.Error(w, "unauthorized: dashboard token required", http.StatusUnauthorized)
+		w.Header().Set("WWW-Authenticate", `Basic realm="Evydencia Bot Panel", charset="UTF-8"`)
+		http.Error(w, "unauthorized: dashboard credentials required", http.StatusUnauthorized)
 		return
 	}
 
@@ -66,6 +73,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		_ = json.NewEncoder(w).Encode(summary)
+
+	case path == "/api/dashboard/events":
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		history, err := h.service.GetEvents(limit)
+		if err != nil {
+			http.Error(w, "failed to load event history", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		_ = json.NewEncoder(w).Encode(history)
 
 	case path == "/painel" || path == "/dashboard":
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
