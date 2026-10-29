@@ -35,11 +35,13 @@ type Config struct {
  AdsUUID string
  GreetingUUID string
  AdsTriggers []string
- AdsFallback bool
+ AdsFallback bool // legacy only; ads no longer auto-greet on unmatched text
+ BusinessPhoneE164 string // verified own line: never a customer
 }
 type Action string
 const (
  Ignore Action = "ignore"
+ OutboundObserved Action = "outbound_observed"
  AdsProposal Action = "ads_proposal"
  Greeting Action = "greeting"
  MenuOption Action = "menu_option"
@@ -87,7 +89,7 @@ func CRMPhone(e164 string)(string,bool) {
 }
 func Select(e Envelope,c Config) Decision {
  d:=Decision{Action:Ignore,InstanceID:e.InstanceID,MessageID:e.Data.Info.ID}
- if e.Event!="Message" || e.Data.Info.IsFromMe || e.Data.Info.ID=="" {d.Reason="not_new_inbound";return d}
+ if e.Event!="Message" || e.Data.Info.ID=="" {d.Reason="not_new_inbound";return d}
  if e.Data.Info.IsGroup {d.Reason="non_private_chat";return d}
  if e.InstanceID!=c.AdsUUID && e.InstanceID!=c.GreetingUUID {d.Reason="unknown_instance";return d}
  chat:=e.Data.Info.Chat
@@ -112,8 +114,20 @@ func Select(e Envelope,c Config) Decision {
   if !ok {phone,ok=JIDPhone(e.Data.Info.SenderAlt)}
  }
  if !ok {d.Reason="unresolved_phone_or_non_private_chat";return d}
+ // A looped/self-chat may be delivered with IsFromMe=false. Never treat
+ // the official business number as a lead, even on an exact ad phrase.
+ if c.BusinessPhoneE164!="" && phone==c.BusinessPhoneE164 {
+  d.Reason="own_business_number";return d
+ }
  d.PhoneE164=phone
  d.CRMPhone,_=CRMPhone(phone)
+ if e.Data.Info.IsFromMe {
+  // Outbound activity is a suppressor for future automatic greetings.
+  // Never enqueue a reply or a CRM proposal from the echo itself.
+  d.Action=OutboundObserved
+  d.Reason="outbound_activity_observed"
+  return d
+ }
  body:=e.Data.Message.Conversation
  if body=="" {body=e.Data.Message.Extended.Text}
  body=Normalize(body)
@@ -124,7 +138,12 @@ func Select(e Envelope,c Config) Decision {
  }
  if e.InstanceID==c.AdsUUID {
   for _,t:=range c.AdsTriggers {if body!="" && body==Normalize(t) {d.Action=AdsProposal;return d}}
-  if !c.AdsFallback {d.Reason="unmatched_ads";return d}
+  // P0: the paid-traffic number is also used for human chats. A generic
+  // inbound message, including a menu digit, must not start an automated
+  // greeting merely because it reached this instance. The old fallback
+  // flag is intentionally ignored until an explicitly consented flow exists.
+  d.Reason="ads_unmatched_no_automation"
+  return d
  }
  switch body {
  case "1","2","3","4","5": d.Action=MenuOption;d.Option=body
