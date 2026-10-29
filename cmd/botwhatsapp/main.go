@@ -93,7 +93,7 @@ func main() {
 			BusinessPhoneE164: adsPhone,
 			Role:              instances.Ads, Enabled: true, TokenEnv: "EVOLUTION_ADS_APIKEY",
 			WebhookSecretEnv: "BOT_ADS_WEBHOOK_SECRET",
-			AdsTriggers:      triggers, AdsFallback: env("BOT_ADS_FALLBACK_MENU", "true") == "true", CRMAllowed: true,
+			AdsTriggers:      triggers, AdsFallback: false, CRMAllowed: true,
 		})
 		secrets["ads"] = os.Getenv("BOT_ADS_WEBHOOK_SECRET")
 		if outboundEnabled {
@@ -143,7 +143,7 @@ func main() {
 	}
 	coreCfg := core.Config{
 		AdsUUID: adsUUID, GreetingUUID: greetingUUID, AdsTriggers: triggers,
-		AdsFallback: env("BOT_ADS_FALLBACK_MENU", "true") == "true",
+		AdsFallback: false,
 	}
 
 	var worker *outbox.Worker
