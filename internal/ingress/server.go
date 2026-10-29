@@ -217,6 +217,19 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	// Never persist own WhatsApp text/media as a new customer lead.
+	// Persist ONLY the activity watermark before ACK, so a staff-initiated
+	// conversation cannot elicit an automatic greeting on the customer's reply.
+	if decision.Action == core.OutboundObserved {
+		if s.settings.OnDecision != nil {
+			if err := s.settings.OnDecision(decision); err != nil {
+				http.Error(w, "outbound conversation state unavailable", http.StatusServiceUnavailable)
+				return
+			}
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 
 	// Stable key for idempotency. Do not embed numbers/names in filenames.
 	key := sha256.Sum256([]byte(uuid + "\x00" + "Message" + "\x00" + msgID))
@@ -232,7 +245,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	// Persist outbox tasks BEFORE acknowledging the webhook. Never detach this
 	// operation into a goroutine; a crash could otherwise lose an ACKed event.
-	if s.settings.OnDecision != nil && (decision.Action != core.Ignore || decision.Reason == "opt_out_requires_persistent_suppression") {
+	if s.settings.OnDecision != nil && (decision.PhoneE164 != "" || decision.Reason == "opt_out_requires_persistent_suppression") {
 		if err := s.settings.OnDecision(decision); err != nil {
 			http.Error(w, "durable outbox unavailable", http.StatusServiceUnavailable)
 			return
