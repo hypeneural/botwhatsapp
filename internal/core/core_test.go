@@ -14,7 +14,7 @@ func TestRouting(t *testing.T){
  a:=fixture("ads-uuid","5548996425287@s.whatsapp.net","  OLÁ!  QUERO a proposta Natal 2026. ","msg1")
  if got:=Select(a,c);got.Action!=AdsProposal||got.CRMPhone!="48996425287"{t.Fatalf("ads: %+v",got)}
  a.Data.Info.IsFromMe=true
- if got:=Select(a,c);got.Action!=Ignore {t.Fatalf("own message: %+v",got)}
+ if got:=Select(a,c);got.Action!=OutboundObserved {t.Fatalf("own message must be recorded but never answered: %+v",got)}
  a.Data.Info.IsFromMe=false;a.Data.Info.Chat="12345@lid"
  if got:=Select(a,c);got.Action!=Ignore{t.Fatalf("lid must not become CRM phone: %+v",got)}
  a=fixture("greet-uuid","5548996425287@s.whatsapp.net","5","msg2")
