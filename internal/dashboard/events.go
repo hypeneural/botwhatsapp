@@ -223,8 +223,17 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 		}
 		if row.Decision == string(core.Ignore) && row.Status != "telefone_nao_resolvido" {
 			row.Status = "ignorado"
-			if row.DecisionReason == "opt_out_requires_persistent_suppression" {
+			switch row.DecisionReason {
+			case "opt_out_requires_persistent_suppression":
 				row.Status = "opt_out"
+			case "ads_unmatched_no_automation":
+				if row.HasAdContext {
+					// A genuine ad-origin hint without an approved trigger
+					// deserves human follow-up, never a generic greeting.
+					row.Status = "atendimento_manual"
+				} else {
+					row.Status = "conversa_organica"
+				}
 			}
 		}
 		byKey[key] = len(result.Events)
@@ -413,6 +422,7 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 		age := time.Since(row.ReceivedAt)
 		if row.Status == "crm_rejeitado" || row.Status == "incerto" ||
 			row.Status == "bloqueado_local" || row.Status == "telefone_nao_resolvido" ||
+			row.Status == "atendimento_manual" ||
 			(age > 5*time.Minute && row.Decision == string(core.AdsProposal) &&
 				(row.Status == "sem_tarefas" || row.Status == "crm_nao_registrado" ||
 					row.Status == "pendente" || row.Status == "em_processamento")) {
