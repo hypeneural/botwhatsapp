@@ -18,6 +18,8 @@ type InboundAudit struct {
 	HasAdContext bool   `json:"has_ad_context"`
 	TriggerMatch bool   `json:"trigger_match"`
 	TriggerText  string `json:"trigger_text,omitempty"`
+	AdSourceID   string `json:"ad_source_id,omitempty"`
+	AdEvidence   string `json:"ad_evidence,omitempty"`
 }
 
 func auditInbound(body []byte, decision core.Decision) InboundAudit {
@@ -64,6 +66,14 @@ func auditInbound(body []byte, decision core.Decision) InboundAudit {
 	}
 	a.HasAdContext = hasMetadata(m.Extended.ContextInfo.ExternalAdReply) ||
 		hasMetadata(m.ContextInfo.ExternalAdReply) || isAdReferral(e.Data.Referral)
+	// Evolution Go 0.7.2 places the protojson externalAdReply in data.referral.
+	// A validated numeric sourceID is only a join candidate, not a proved Ad ID.
+	ref := parseAdReference(e.Data.Referral, m.Extended.ContextInfo.ExternalAdReply)
+	if ref.Evidence == "" {
+		ref = parseAdReference(nil, m.ContextInfo.ExternalAdReply)
+	}
+	a.AdSourceID, a.AdEvidence = ref.SourceID, ref.Evidence
+
 	a.TriggerMatch = decision.Action == core.AdsProposal
 	if a.TriggerMatch {
 		a.TriggerText = a.Text
