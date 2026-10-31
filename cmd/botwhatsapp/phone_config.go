@@ -1,34 +1,39 @@
 package main
 
 import (
-	"errors"
-	"strings"
+    "errors"
+    "strings"
+
+    "github.com/hypeneural/botwhatsapp/internal/core"
 )
 
-const activeAdsPhoneE164 = "5548996425287"
-
-// adsPhoneFromEnv fail-closes when an ads role is configured with no explicitly
-// approved number. It NEVER calls the network or sends a message.
-func adsPhoneFromEnv(getenv func(string) string) (string, error) {
-	p := strings.TrimSpace(getenv("BOT_ADS_PHONE"))
-	if p == "" {
-		return "", errors.New("BOT_ADS_PHONE must be explicitly configured for enabled ads role")
-	}
-	if p != activeAdsPhoneE164 {
-		return "", errors.New("BOT_ADS_PHONE differs from approved ads-number contract (ending 5287)")
-	}
-	return p, nil
+// configuredBusinessPhone validates an explicit Brazilian E.164 number. The
+// phone is *not* a routing authority by itself: the Antigravity preflight must
+// verify it belongs to the configured Evolution instance UUID and API key
+// before changing any webhook or enabling outbound.
+func configuredBusinessPhone(getenv func(string) string, key string) (string, error) {
+    phone := strings.TrimSpace(getenv(key))
+    if phone == "" {
+        return "", errors.New(key + " is required for an enabled instance")
+    }
+    if parsed, ok := core.JIDPhone(phone + "@s.whatsapp.net"); !ok || parsed != phone {
+        return "", errors.New(key + " must be a Brazilian E.164 number with DDI 55 and DDD")
+    }
+    return phone, nil
 }
 
-// greetingPhoneFromEnv cannot silently reuse the ads role's number.
-// The ads role already handles the greeting/menu fallback on unmatched texts.
+func adsPhoneFromEnv(getenv func(string) string) (string, error) {
+    return configuredBusinessPhone(getenv, "BOT_ADS_PHONE")
+}
+
+// Greeting is a separate role and must never share the Ads line.
 func greetingPhoneFromEnv(getenv func(string) string, adsPhone string) (string, error) {
-	p := strings.TrimSpace(getenv("BOT_GREETING_PHONE"))
-	if p == "" {
-		return "", errors.New("BOT_GREETING_PHONE must be explicitly configured for enabled greeting role")
-	}
-	if p == adsPhone && adsPhone != "" {
-		return "", errors.New("greeting role may not duplicate ads phone; use ads fallback greeting on 5287")
-	}
-	return p, nil
+    phone, err := configuredBusinessPhone(getenv, "BOT_GREETING_PHONE")
+    if err != nil {
+        return "", err
+    }
+    if phone == adsPhone && adsPhone != "" {
+        return "", errors.New("greeting role cannot share the configured Ads number")
+    }
+    return phone, nil
 }
