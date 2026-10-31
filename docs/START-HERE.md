@@ -1,4 +1,6 @@
 # START-HERE — BotWhatsApp (vigente em 31/10/2026)
+> **NOVO: PÓS-CUTOVER REPORTADO 31/10.** Use `docs/PROMPT_ANTIGRAVITY_CTWA_POST_CUTOVER_20261031.md` e `docs/CTWA_POST_CUTOVER_GATES_20261031.md` para a tarefa corrente. Bot/relay e webhook foram reportados como atualizados pelo Antigravity, mas canário, rotação dos segredos vazados e verificação dos ACKs nos dois destinos ainda não estão comprovados. As instruções de pré-cutover abaixo são históricas. Não executar novos POSTs Evolution ou enviar WhatsApp nesta etapa.
+
 
 **Fonte operacional para Antigravity Flash Lite; somente a seção vigente abaixo orienta mudanças.** Documentos e exemplos de 22–27/10 podem descrever 0440, fallback de saudação ou endpoint CRM 416; são **históricos e estão superados**.
 
