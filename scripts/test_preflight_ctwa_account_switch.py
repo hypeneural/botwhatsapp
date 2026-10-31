@@ -80,6 +80,25 @@ class AccountSwitchTests(unittest.TestCase):
         got=switch.verify_inventory(inv,bot,relay)
         self.assertFalse(got["checks"]["unique_provider_uuid"])
 
+    def test_old_outbox_blocks_switch_until_reconciled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            uuid="00000000-0000-4000-8000-000000000002"
+            task=root/("a"*64+".json")
+            task.write_text(__import__("json").dumps({
+                "instance_id":uuid,"state":"attempt_started",
+                "phone_e164":"5548999991234",
+                "step":"schedule_natal_crm"}),encoding="utf-8")
+            task.chmod(0o600)
+            report=switch.inspect_previous_outbox(root,uuid)
+            self.assertFalse(report["old_outbox_clear"])
+            self.assertEqual(report["unresolved_previous_ads_tasks"],1)
+            self.assertNotIn("5548999991234",str(report))
+            task.write_text(__import__("json").dumps({
+                "instance_id":uuid,"state":"confirmed"}),encoding="utf-8")
+            report=switch.inspect_previous_outbox(root,uuid)
+            self.assertTrue(report["old_outbox_clear"])
+
     def test_private_input_refuses_world_readable_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/"env"
