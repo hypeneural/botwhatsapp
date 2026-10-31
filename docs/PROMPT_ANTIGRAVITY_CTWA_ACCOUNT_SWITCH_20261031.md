@@ -60,7 +60,7 @@ python3 scripts/preflight_ctwa_account_switch.py \
   --outbox-tasks-dir /PRIVATE/current-spool/tasks
 ```
 
-Arquivos devem ser 0600; somente o resumo de booleanos pode ir ao Git. Se o provider não expuser `token` no inventário, registrar bloqueio em `api_key_verified`: comprovar por endpoint de STATUS usando a chave da nova instância e ajustar o preflight com teste específico. Nunca desabilitar proteção para conseguir PASS.
+Arquivos devem ser 0600; somente o resumo de booleanos pode ir ao Git. Se a resposta do inventário não incluir `token`, habilitar `--verify-live-status --provider-base-url http://127.0.0.1:14000` no próprio preflight, para comprovar a chave com GET autenticado de status e JID da sessão. Bloqueie em qualquer resposta incerta; jamais desabilite o gate.
 
 **A TROCA DE NÚMERO NÃO FOI PEDIDA NESTE CORTE.** Não alterar atualmente a instância 5287, Meta Ads, Evolution, CRM, relay ou as rotas por conta própria. Um futuro plano de troca deverá incluir atualização do número de destino dos anúncios Meta e rollback de ambas as instâncias.
 
