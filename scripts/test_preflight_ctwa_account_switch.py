@@ -71,8 +71,8 @@ class AccountSwitchTests(unittest.TestCase):
                 path.write_text(data,encoding="utf-8")
                 path.chmod(0o600)
                 return str(path)
-            a=private_file("bot.env","\\n".join(f"{k}={v}" for k,v in bot.items()))
-            b=private_file("relay.env","\\n".join(f"{k}={v}" for k,v in relay.items()))
+            a=private_file("bot.env","\n".join(f"{k}={v}" for k,v in bot.items()))
+            b=private_file("relay.env","\n".join(f"{k}={v}" for k,v in relay.items()))
             j=private_file("instances.json",json.dumps(inv))
             output=io.StringIO()
             with contextlib.redirect_stdout(output):
