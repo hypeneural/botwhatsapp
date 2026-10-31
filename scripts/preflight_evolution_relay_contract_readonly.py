@@ -15,7 +15,7 @@ import sys
 def read_private(path, *, json_content=False):
     p = Path(path)
     st = p.stat()
-    if not stat.S_ISREG(st.st_mode) or st.st_mode & 0o077 or st.st_size > 2 * 1024 * 1024:
+    if not stat.S_ISREG(st.st_mode) or (sys.platform != 'win32' and st.st_mode & 0o077) or st.st_size > 2 * 1024 * 1024:
         raise ValueError("private_sample_required")
     raw = p.read_text(encoding="utf-8")
     return json.loads(raw) if json_content else raw.strip()

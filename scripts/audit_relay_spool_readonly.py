@@ -26,7 +26,7 @@ def inspect(root: Path):
             counts["other_files"] += 1
             continue
         info = path.lstat()
-        if not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077:
+        if not stat.S_ISREG(info.st_mode) or (sys.platform != 'win32' and info.st_mode & 0o077):
             counts["unsafe_permissions"] += 1
             continue
         counts["records"] += 1

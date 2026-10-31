@@ -1,3 +1,4 @@
+import sys
 """Run with python3 -m unittest scripts/test_relay_forensic_readonly.py -v."""
 import importlib.util
 import json
@@ -47,8 +48,9 @@ class RelayForensicTests(unittest.TestCase):
             path.write_text("{}", encoding="utf-8")
             path.chmod(0o600)
             self.assertEqual(spool.inspect(Path(directory))["status"], "BLOCKED")
-            path.chmod(0o644)
-            self.assertEqual(spool.inspect(Path(directory))["counts"]["unsafe_permissions"], 1)
+            if sys.platform != "win32":
+                path.chmod(0o644)
+                self.assertEqual(spool.inspect(Path(directory))["counts"]["unsafe_permissions"], 1)
 
     def test_evolution_072_shape_and_documented_main_shape(self):
         uuid = "uuid-test"
@@ -72,10 +74,11 @@ class RelayForensicTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             file = Path(directory) / "event.json"
             file.write_text("{}", encoding="utf-8")
-            file.chmod(0o644)
-            with self.assertRaises(ValueError):
-                contract.read_private(str(file), json_content=True)
-            file.chmod(0o600)
+            if sys.platform != "win32":
+                file.chmod(0o644)
+                with self.assertRaises(ValueError):
+                    contract.read_private(str(file), json_content=True)
+                file.chmod(0o600)
             self.assertEqual(contract.read_private(str(file), json_content=True), {})
 
 
