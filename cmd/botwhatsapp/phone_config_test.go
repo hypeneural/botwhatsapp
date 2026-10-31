@@ -2,51 +2,47 @@ package main
 
 import "testing"
 
-func TestAdsPhoneExplicit5287Only(t *testing.T) {
-	cases := []struct {
-		name  string
-		value string
-		ok    bool
-	}{
-		{"valid", "5548996425287", true},
-		{"whitespace", " 5548996425287 ", true},
-		{"missing", "", false},
-		{"legacy", "554832200440", false},
-		{"different", "5548999999999", false},
-		{"short", "5287", false},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			got, err := adsPhoneFromEnv(func(k string) string {
-				if k != "BOT_ADS_PHONE" {
-					t.Fatal("unexpected env key")
-				}
-				return c.value
-			})
-			if c.ok && (err != nil || got != activeAdsPhoneE164) {
-				t.Fatalf("expected approved phone (redacted), got error %v", err)
-			}
-			if !c.ok && err == nil {
-				t.Fatal("unapproved ads phone was accepted")
-			}
-		})
-	}
+func TestAdsPhoneExplicitAndChangeable(t *testing.T) {
+    cases := []struct {
+        name, value string
+        ok bool
+    }{
+        {"current", "5548996425287", true},
+        {"current with spaces", " 5548996425287 ", true},
+        {"other valid local", "5548999999999", true},
+        {"historical number not implicitly blocked by code", "554832200440", true},
+        {"missing", "", false},
+        {"no DDI", "48999999999", false},
+        {"too short", "5287", false},
+        {"foreign country code", "13475551234", false},
+        {"bad characters", "55+48999999999", false},
+        {"has suffix", "5548999999999@s.whatsapp.net", false},
+    }
+    for _, tc := range cases {
+        t.Run(tc.name,func(t *testing.T) {
+            phone, err := adsPhoneFromEnv(func(key string) string {
+                if key != "BOT_ADS_PHONE" {t.Fatalf("wrong key %s",key)}
+                return tc.value
+            })
+            if (err == nil) != tc.ok {t.Fatalf("accepted=%t want %t",err==nil,tc.ok)}
+            if tc.ok && phone == "" {t.Fatal("valid configured number was lost")}
+        })
+    }
 }
 
-func TestGreetingRoleMustHaveDistinctExplicitPhone(t *testing.T) {
-	for _, tc := range []struct {
-		label, value, ads string
-		ok                bool
-	}{
-		{"missing", "", activeAdsPhoneE164, false},
-		{"same", activeAdsPhoneE164, activeAdsPhoneE164, false},
-		{"separate", "5548999999999", activeAdsPhoneE164, true},
-	} {
-		t.Run(tc.label, func(t *testing.T) {
-			_, err := greetingPhoneFromEnv(func(k string) string { return tc.value }, tc.ads)
-			if (err == nil) != tc.ok {
-				t.Fatalf("expected ok=%v, got err=%v", tc.ok, err)
-			}
-		})
-	}
+func TestGreetingRoleCannotShareAdsOrUseInvalidNumber(t *testing.T) {
+    for _, tc := range []struct {
+        name, ads, greeting string
+        ok bool
+    }{
+        {"separate", "5548996425287", "5548999999999", true},
+        {"missing", "5548996425287", "", false},
+        {"same number", "5548996425287", "5548996425287", false},
+        {"invalid", "5548996425287", "5287", false},
+    } {
+        t.Run(tc.name,func(t *testing.T) {
+            _,err := greetingPhoneFromEnv(func(k string) string{return tc.greeting},tc.ads)
+            if (err==nil)!=tc.ok {t.Fatalf("accepted=%t want %t",err==nil,tc.ok)}
+        })
+    }
 }
