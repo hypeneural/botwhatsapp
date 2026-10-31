@@ -15,8 +15,8 @@ func TestPendingIndexPersistsAndHonorsPartialSinkAcks(t *testing.T) {
     if err!=nil {t.Fatal(err)}
     first:=strings.Repeat("a",64)
     second:=strings.Repeat("b",64)
-    if ok,err:=s.Insert(first,[]byte("synthetic-1"));err!=nil||!ok {t.Fatal(ok,err)}
-    if ok,err:=s.Insert(second,[]byte("synthetic-2"));err!=nil||!ok {t.Fatal(ok,err)}
+    if ok,err:=s.Insert(first,[]byte(`{"event":"Message"}`));err!=nil||!ok {t.Fatal(ok,err)}
+    if ok,err:=s.Insert(second,[]byte(`{"event":"Message"}`));err!=nil||!ok {t.Fatal(ok,err)}
     due,err:=s.Pending(time.Now())
     if err!=nil||!reflect.DeepEqual(due,[]string{first,second}){t.Fatalf("unsorted initial due index: %v %v",due,err)}
     future:=time.Now().Add(time.Hour)
@@ -38,7 +38,7 @@ func TestPendingIndexPersistsAndHonorsPartialSinkAcks(t *testing.T) {
     if err!=nil {t.Fatal(err)}
     due,err=again.Pending(time.Now())
     if err!=nil||len(due)!=0{t.Fatalf("completed tombstone was scheduled: %v %v",due,err)}
-    if ok,err:=again.Insert(first,[]byte("duplicate"));err!=nil||ok{t.Fatalf("duplicate replayed: %t %v",ok,err)}
+    if ok,err:=again.Insert(first,[]byte(`{"event":"Message"}`));err!=nil||ok{t.Fatalf("duplicate replayed: %t %v",ok,err)}
 }
 
 func TestPendingIndexRejectsCorruptSpoolOnStartup(t *testing.T){
@@ -53,7 +53,7 @@ func TestPendingIndexDoesNotTreatCompletedTombstonesAsWork(t *testing.T){
     if err!=nil{t.Fatal(err)}
     for i:=0;i<30;i++{
         k:=strings.Repeat(string(rune('a'+i%6)),63)+string(rune('0'+i%10))
-        if ok,err:=s.Insert(k,[]byte("synthetic"));err!=nil||!ok{t.Fatal(err)}
+        if ok,err:=s.Insert(k,[]byte(`{"event":"Message"}`));err!=nil||!ok{t.Fatal(err)}
         if _,err:=s.UpdateSink(k,true,time.Now());err!=nil{t.Fatal(err)}
         if _,err:=s.UpdateSink(k,false,time.Now());err!=nil{t.Fatal(err)}
     }
