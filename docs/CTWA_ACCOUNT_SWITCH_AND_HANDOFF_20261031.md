@@ -1,4 +1,6 @@
 # P0 CTWA — Configuração de número e retirada da mensagem de encaminhamento (31/10/2026)
+> **REGISTRO HISTÓRICO PRÉ-CUTOVER.** O Antigravity reportou cutover posterior no commit 577ee46. Para o passo vigente use `docs/PROMPT_ANTIGRAVITY_CTWA_POST_CUTOVER_20261031.md` e `docs/CTWA_POST_CUTOVER_GATES_20261031.md`. Diferença entre E.164 anunciado e JID pareado **não** autoriza excluir automaticamente o nono dígito; `BOT_ADS_PAIRED_JID` é explicitamente verificado. Segredos de webhook antigos precisam ser rotacionados; o canário segue não comprovado.
+
 
 **Repositório:** `hypeneural/botwhatsapp`, PR #10 (`fix/ctwa-native-proposal-handoff-20261027`).  
 **Vizinhos:** `hypeneural/smartdialer-platform` PR #41, Evolution Go 0.7.2, CRM V4 — **somente leitura nesta fase**.  
