@@ -55,10 +55,10 @@ flowchart TD
     subgraph Relay["Relay Dual Durável (8790)"]
         Evo ==>|Webhook Cutover Concluído| Ingress["botwhatsapp-stage-relay-greeting-1:8790<br/>POST /webhook/evolution/<SECRET>"]
         Ingress --> Disk["Spool Durável em Disco (0600)<br/>Capacidade: 100k eventos (19% usado)"]
-        Disk --> FanOut["Despachador Fan-Out Paralelo"]
+        Disk --> FanOut["Despachador Fan-Out Sequencial"]
     end
 
-    subgraph Consumidores["Consumidores Paralelos"]
+    subgraph Consumidores["Consumidores em Ordem"]
         FanOut -->|1. Entrega Telemetria| SE["whatsapp-status-status-engine-1:8050<br/>wa_webhook_logs + Repasse SmartDialer"]
         FanOut -->|2. Entrega Atendimento| Bot["botwhatsapp-stage-bot-1:8788<br/>PR #10 (sem encerramento legado)"]
     end
@@ -94,7 +94,7 @@ flowchart TD
 
 ### C. Cutover Efetivo do Webhook na Evolution GO:
 - O webhook da instância `evydencia` (`50e7ab4d-a380-42be-ab8a-d85fa982bfec`) foi atualizado com sucesso via chamada autenticada ao endpoint `/instance/connect`:
-  - **Nova URL:** `http://botwhatsapp-stage-relay-greeting-1:8790/webhook/evolution/19778890a4dd31671a765b544ece84fd5ec330e7af529afd584e5fb8f541c937`
+  - **Nova URL:** `http://botwhatsapp-stage-relay-greeting-1:8790/webhook/evolution/<SEGREDO_PRIVADO_ROTACIONAR>`
   - **Eventos Assinados:** `MESSAGE`, `SEND_MESSAGE`, `READ_RECEIPT`, `PRESENCE`, `HISTORY_SYNC`, `CHAT_PRESENCE`, `CALL`, `CONNECTION`, `LABEL`, `CONTACT`, `GROUP`, `NEWSLETTER`, `QRCODE`, `BUTTON_CLICK`, `PICTURE`, `USER_ABOUT`.
   - **Confirmação no PostgreSQL (`evogo_users.instances`):** `True`.
 
@@ -122,11 +122,11 @@ flowchart TD
 O sistema encontra-se ativo e aguardando a execução do canário único de teste autorizado:
 
 1. **Mensagem Orgânica ("Oi" / "Boa tarde"):**
-   - **Comportamento Comprovado:** O bot **não** responde automação e não cria proposta no CRM (`conversa_organica`). O relay entrega o evento ao Status Engine para telemetria e ao Bot para registro sem resposta.
+   - **Comportamento Esperado — CANÁRIO PENDENTE:** O bot **não** responde automação e não cria proposta no CRM (`conversa_organica`). O relay entrega o evento ao Status Engine para telemetria e ao Bot para registro sem resposta.
 2. **Mensagem Própria (`IsFromMe` / WhatsApp Web):**
-   - **Comportamento Comprovado:** O bot identifica a atividade humana da empresa (`OutboundObserved`) e silencia qualquer intervenção automática.
+   - **Comportamento Esperado — CANÁRIO PENDENTE:** O bot identifica a atividade humana da empresa (`OutboundObserved`) e silencia qualquer intervenção automática.
 3. **Gatilho Exato de Anúncio (`Quero conhecer os pacotes do Primeiro Natal em Tijucas`):**
-   - **Comportamento Comprovado:** O bot despacha:
+   - **Comportamento Esperado — CANÁRIO PENDENTE:** O bot despacha:
      - Boas-vindas personalizadas.
      - Áudio explicativo PTT.
      - PDF oficial da proposta.
