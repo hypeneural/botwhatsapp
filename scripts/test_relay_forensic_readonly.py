@@ -42,6 +42,25 @@ class RelayForensicTests(unittest.TestCase):
             self.assertFalse(result["delivery_proven"])
             self.assertNotIn("Message", str(result))
 
+    def test_capacity_warning_prevents_false_relay_ready_claim(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / ("a" * 64 + ".json")
+            path.write_text(json.dumps({
+                "key": "a" * 64,
+                "status_done": True,
+                "bot_done": True,
+                "completed_at": "2026-10-30T10:00:00Z"
+            }), encoding="utf-8")
+            path.chmod(0o600)
+            self.assertEqual(
+                spool.inspect(Path(directory), max_events=1)["status"],
+                "CAPACITY_WARNING",
+            )
+            self.assertEqual(
+                spool.inspect(Path(directory), max_events=10)["status"],
+                "INVENTORY_ONLY",
+            )
+
     def test_spool_rejects_insecure_or_corrupt_files(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / ("a" * 64 + ".json")
