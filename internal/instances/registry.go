@@ -34,6 +34,7 @@ type Definition struct {
  Slug string
  InstanceUUID string
  BusinessPhoneE164 string
+ BusinessPhoneAliases []string // verified own-line alternatives, no inferred Brazilian digit rewrite
  Role Role
  Enabled bool
  TokenEnv string
@@ -72,6 +73,11 @@ func New(defs []Definition)(*Registry,error){
    d.WebhookSecretEnv!="" && !envRE.MatchString(d.WebhookSecretEnv){
    return nil,fmt.Errorf("%w: invalid ENV variable identifier",ErrInvalid)
   }
+  for _,alias:=range d.BusinessPhoneAliases {
+   if !phoneRE.MatchString(alias) || alias==d.BusinessPhoneE164 {
+    return nil,fmt.Errorf("%w: own-business alias must be distinct valid E.164",ErrInvalid)
+   }
+  }
   if d.Role==Ads && d.Enabled && len(d.AdsTriggers)==0{
    return nil,fmt.Errorf("%w: ads role requires explicit triggers",ErrInvalid)
   }
@@ -109,6 +115,7 @@ func (r *Registry) Decide(e core.Envelope) (core.Decision,error){
  d,err:=r.ResolveUUID(e.InstanceID);if err!=nil{return core.Decision{},err}
  var cfg core.Config
  cfg.BusinessPhoneE164=d.BusinessPhoneE164
+ cfg.BusinessPhoneAliases=d.BusinessPhoneAliases
  switch d.Role{
  case Ads:
   cfg.AdsUUID=d.InstanceUUID
