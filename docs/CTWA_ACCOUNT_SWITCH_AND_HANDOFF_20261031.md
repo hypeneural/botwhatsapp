@@ -44,7 +44,7 @@ python3 scripts/preflight_ctwa_account_switch.py \
   --outbox-tasks-dir /PRIVATE/current-spool/tasks
 ```
 
-Arquivos de entrada precisam ser 0600. Se a API não devolver `token` no GET, o teste acusa `api_key_verified=false` e **bloqueia**; o operador deve provar o vínculo da chave num read-only `/instance/status` autenticado e estender o método em uma revisão explícita, sem desabilitar a proteção. Valores não são impressos, só booleanos. A ferramenta não lê/escreve o banco CRM nem cria instância/QR/campanha.
+Arquivos de entrada precisam ser 0600. Se o inventário da API não fornecer `token`, acrescente `--verify-live-status --provider-base-url http://127.0.0.1:14000`: o script usa a `apikey` candidata num **GET autenticado** a `/instance/status` (somente loopback), verifica a conexão e o `myJid`, e não imprime resposta privada. Se esse GET não passar, o corte fica bloqueado. Valores não são impressos, só booleanos. A ferramenta não lê/escreve o banco CRM nem cria instância/QR/campanha.
 
 4. Verificar `old_outbox_clear=true` (nenhuma task `pending`, `attempt_started` ou `uncertain` associada à antiga UUID). **Não apagar ou reenviar fila** para conseguir passar. Reconciliação pontual é necessária quando houver pendências.
 5. Confirmar em modo leitura que o relay usa porta REAL (8790 segundo dossiê; 8789 no template), tem volume durável, rede e duas rotas; Status Engine PR #41 terá encaminhamento SmartDialer privado funcionando. Snapshot do spool, imagem atual e rollback ANTES de reconstruir exclusivamente o bot.
