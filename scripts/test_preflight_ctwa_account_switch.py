@@ -36,7 +36,7 @@ class AccountSwitchTests(unittest.TestCase):
     def test_complete_binding_is_ready_without_disclosing_secrets(self):
         bot,relay,inv=fixture()
         out=switch.verify_inventory(inv,bot,relay)
-        self.assertEqual(out["status"],"READY_FOR_AUTHORIZED_CUTOVER")
+        self.assertEqual(out["status"],"PASS_BINDINGS_ONLY")
         self.assertFalse(out["changes_performed"])
         self.assertNotIn(bot["BOT_ADS_PHONE"],str(out))
         self.assertNotIn(bot["EVOLUTION_ADS_APIKEY"],str(out))
@@ -49,7 +49,7 @@ class AccountSwitchTests(unittest.TestCase):
         out=switch.verify_inventory(inv,bot,relay,previous)
         self.assertTrue(out["checks"]["phone_change_requested"])
         self.assertTrue(out["checks"]["uuid_change_requested"])
-        self.assertEqual(out["status"],"READY_FOR_AUTHORIZED_CUTOVER")
+        self.assertEqual(out["status"],"PASS_BINDINGS_ONLY")
         bot["BOT_ADS_PHONE"]="5548999999999"
         bad=switch.verify_inventory(inv,bot,relay,previous)
         self.assertEqual(bad["status"],"BLOCKED_ACCOUNT_BINDING")
@@ -66,6 +66,18 @@ class AccountSwitchTests(unittest.TestCase):
             if change=="same_greeting":b["BOT_GREETING_PHONE"]=b["BOT_ADS_PHONE"]
             got=switch.verify_inventory(inv,b,r)
             self.assertEqual(got["status"],"BLOCKED_ACCOUNT_BINDING",change)
+
+    def test_live_authenticated_status_can_prove_token_when_inventory_omits_it(self):
+        bot,relay,inv=fixture()
+        del inv["data"][0]["token"]
+        assert switch.verify_inventory(inv,bot,relay)["status"]=="BLOCKED_ACCOUNT_BINDING"
+        result=switch.verify_inventory(inv,bot,relay,provider_auth_proof=True)
+        self.assertEqual(result["status"],"PASS_BINDINGS_ONLY")
+        self.assertTrue(result["checks"]["api_key_verified"])
+
+    def test_live_provider_url_must_be_loopback(self):
+        with self.assertRaises(ValueError):
+            switch.verify_live_instance_token("http://example.com:14000","key","5548996425287")
 
     def test_missing_provider_token_cannot_fake_verification(self):
         bot,relay,inv=fixture()
