@@ -31,10 +31,10 @@
 
 4. **Cutover do Webhook:**
    - O Webhook da instância `evydencia` na Evolution GO foi alterado com sucesso via endpoint `/instance/connect` para o Relay dual:
-     `http://botwhatsapp-stage-relay-greeting-1:8790/webhook/evolution/19778890a4dd31671a765b544ece84fd5ec330e7af529afd584e5fb8f541c937`
-   - O Relay grava os eventos em disco com persistência durável (`202 Accepted`) e faz o fan-out paralelo para:
+     `http://botwhatsapp-stage-relay-greeting-1:8790/webhook/evolution/<SEGREDO_PRIVADO_ROTACIONAR>`
+   - O Relay grava os eventos em disco com persistência durável (`202 Accepted`) e faz o Fan-Out Sequencial para:
      1. Status Engine: `http://whatsapp-status-status-engine-1:8050/webhook/evolution/evydencia`
-     2. Bot: `http://bot:8788/webhook/ads/0a989d0e7778d39996205abc27bb52f29aef789fd1081790106cbf92474bc6a7`
+     2. Bot: `http://bot:8788/webhook/ads/<SEGREDO_PRIVADO_ROTACIONAR>`
 
 ---
 
@@ -83,5 +83,5 @@
 Em caso de qualquer falha no canário:
 1. Reverter a URL do Webhook na Evolution GO para:
    `http://whatsapp-status-status-engine-1:8050/webhook/evolution/evydencia`
-2. Parar o contêiner do Bot: `cd /srv/platform/stacks/botwhatsapp/deploy && docker compose -f compose.staging.yaml -f compose.override.yaml stop bot`
-3. O SmartDialer Status Engine volta imediatamente a receber eventos diretos, sem perda de dados.
+2. Não parar o contêiner do Bot automaticamente; apenas verificar ACKs pendentes no relay, confirmar que não houve envio duplicado e consultar o plano privado de rollback.
+3. O Status Engine volta a receber diretamente os próximos eventos; verificar fila/ACKs pendentes no relay e reconciliar sem reenvio comercial. **Não assumir perda zero nem interromper o bot automaticamente**.
