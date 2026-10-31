@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fail-closed offline preflight for switching the CTWA Ads business account.
 
-Reads operator-only 0600 files; makes NO network calls or changes. The
+Reads operator-only 0600 files; only --verify-live-status makes one read-only\nloopback GET /instance/status; it never sends or changes anything. The
 Evolution inventory file must be a privately captured GET /instance/all JSON
 from the target VPS and version. Nothing sensitive is printed, including
 numbers, UUIDs, JIDs, URLs, tokens and ad copy.
