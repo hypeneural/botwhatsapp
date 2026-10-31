@@ -52,6 +52,10 @@ func New(defs []Definition)(*Registry,error){
  if len(defs)==0{return nil,fmt.Errorf("%w: empty registry",ErrInvalid)}
  r:=&Registry{byID:make(map[string]Definition,len(defs)),
   bySlug:make(map[string]Definition,len(defs)),byPhone:make(map[string]Definition,len(defs))}
+ // Every identity and explicitly verified own-number alias must be owned by
+ // exactly one role. Duplicate aliases across Ads/Greeting are unsafe even
+ // if the UUIDs differ; do not route an echo as another role's lead.
+ seenOwnPhones:=make(map[string]string)
  for _,d:=range defs{
   if !slugRE.MatchString(d.Slug) ||
    (d.Role!=Ads&&d.Role!=Greeting&&d.Role!=Observe) ||
@@ -77,6 +81,14 @@ func New(defs []Definition)(*Registry,error){
    if !phoneRE.MatchString(alias) || alias==d.BusinessPhoneE164 {
     return nil,fmt.Errorf("%w: own-business alias must be distinct valid E.164",ErrInvalid)
    }
+  }
+  localPhones:=append([]string(nil),d.BusinessPhoneAliases...)
+  if d.BusinessPhoneE164!="" {localPhones=append(localPhones,d.BusinessPhoneE164)}
+  for _,own:=range localPhones{
+   if prior,exists:=seenOwnPhones[own];exists{
+    return nil,fmt.Errorf("%w: own-phone shared by roles (%s)",ErrInvalid,prior)
+   }
+   seenOwnPhones[own]=d.Slug
   }
   if d.Role==Ads && d.Enabled && len(d.AdsTriggers)==0{
    return nil,fmt.Errorf("%w: ads role requires explicit triggers",ErrInvalid)
