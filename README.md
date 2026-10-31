@@ -1,8 +1,14 @@
 # BotWhatsApp — Estúdio Evidência
 
+> **STATUS ATUAL PR #10, 31/10/2026 — PÓS-CUTOVER REPORTADO, CANÁRIO NÃO COMPROVADO:** O Antigravity relatou rebuild isolado de bot/relay e alteração do webhook da Evolution para o relay. O ChatGPT confirmou os commits/documentos, mas **não verificou a VPS diretamente**. Duas capacidades secretas de webhook foram publicadas em dossiês antigos: versões atuais redigidas, rotação privada **obrigatória**. Nunca confiar em HTTP 200 do healthcheck como prova de entrega aos dois consumidores. O funil Ads responde apenas a gatilho exato, não saúda conversas orgânicas nem envia o texto final sobre outro WhatsApp. O E.164 comercial e o JID pareado podem diferir; usar `BOT_ADS_PAIRED_JID` somente após verificação do provider, sem remover/adicionar nono dígito do cadastro.
+>
+> **Ordem única para Antigravity:** [START-HERE](docs/START-HERE.md) → [auditoria pós-cutover](docs/CTWA_POST_CUTOVER_GATES_20261031.md) → [prompt de execução](docs/PROMPT_ANTIGRAVITY_CTWA_POST_CUTOVER_20261031.md). Documentos anteriores são históricos. **Não executar novo /instance/connect, reset/replay, deploy ou campanha real nesta etapa.**
+
+---
+
 > **Hotfix em revisão (PR #10, 27/10/2026):** Ads somente no WhatsApp final **5287**; agendamento Natal pelo endpoint nativo `/api/v1/extension/proposals/schedule`; painel `/painel` com `/api/dashboard/events`, login restrito e histórico por mensagem. A API batch 415/416 tornou-se inválida. Contrato canônico do hotfix: [docs/CTWA-NATIVE-HANDOFF-20261027.md](docs/CTWA-NATIVE-HANDOFF-20261027.md). As seções abaixo são histórico da main em 22/10 e não autorizam deploy.\n
 
-Serviço Go independente para dois workflows do WhatsApp no Estúdio Evidência, integrado à **Evolution Go 0.7.2 instalada** e à **API existente do Evidência CRM**. O número conectado aos anúncios recebe primeiro tratamento CTWA configurável, com saudação genérica se a frase não corresponder. Não modificar o código, banco ou infraestrutura do CRM.
+Serviço Go independente para dois workflows do WhatsApp no Estúdio Evidência, integrado à **Evolution Go 0.7.2 instalada** e à **API existente do Evidência CRM**. O canal Ads exige frase exata; mensagens orgânicas não acionam saudação, menu nem proposta. Não modificar o código, banco ou infraestrutura do CRM.
 
 **Release CTWA 5287:** [gates operacionais, preflight somente leitura, volume persistente e canário único](docs/RELEASE-BOT-CTWA-5287-20261027.md). Não utilizar o Compose staging na VPS para substituir o serviço real.\n\n**Painel do gestor (PR #10):** [guia do painel e prévia local](docs/PAINEL-GESTOR-CTWA-20261027.md). Histórico de mensagens, origem com grau de evidência, contadores de atenção e timeline das APIs. O script local `scripts/validate-ctwa-handoff-local.ps1 -Format -Preview` faz testes e abre dados fictícios sem tocar nas APIs comerciais.
 
