@@ -64,8 +64,10 @@ func main() {
 		log.Fatalf("invalid ad trigger configuration: %T", err)
 	}
 
-	// Exact production identity: 0440 is historical, 5287 receives Ads
-	// and performs its own generic greeting fallback. Never silently remap.
+	// Ads identity comes from an explicitly configured E.164 number and
+	// Evolution UUID. Before changing accounts, the read-only production
+	// preflight must verify the UUID/phone/token/webhook binding. Never
+	// redirect a conversation simply because the phone ENV changed.
 	adsPhone, greetingPhone := "", ""
 	if adsUUID != "" {
 		adsPhone, err = adsPhoneFromEnv(os.Getenv)
@@ -198,14 +200,6 @@ func main() {
 			}
 			adWelcome = string(raw)
 		}
-		adClosing := env("BOT_ADS_CLOSING_TEXT", "O nosso outro WhatsApp vai entrar em contato com mais informações também, mas qualquer dúvida pode falar.")
-		if path := os.Getenv("BOT_ADS_CLOSING_TEXT_FILE"); path != "" {
-			raw, err := os.ReadFile(path)
-			if err != nil || strings.TrimSpace(string(raw)) == "" {
-				log.Fatal("invalid ad closing text file")
-			}
-			adClosing = string(raw)
-		}
 		cfg := outbox.Config{
 			DataDir: dataDir, GreetingCooldown: 24 * time.Hour, AdsFlowCooldown: time.Duration(adsCooldownHours) * time.Hour,
 			OperationalAuthorization: opAuth,
@@ -220,7 +214,6 @@ func main() {
 			AdImageFixture:           adImage,
 			AdVideoFixture:           adVideo,
 			AdWelcomeText:            adWelcome,
-			AdClosingText:            adClosing,
 			Tenant:                   env("BOT_TENANT", "estudio-evydencia"),
 			Location:                 loc,
 			TaskRetention:            30 * 24 * time.Hour,
