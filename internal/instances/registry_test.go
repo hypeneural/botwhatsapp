@@ -70,3 +70,25 @@ func TestEventAndLeadKeys(t *testing.T){
  if k1!=k3{t.Fatal("same brand lead/slot must dedup across instances")}
  if _,err:=LeadClaimKey("estudio","5548996553954",416,now,loc);err==nil{t.Fatal("DDI must be stripped")}
 }
+
+func TestVerifiedOwnAliasMustNotOverlapAnotherRole(t *testing.T) {
+ defs:=[]Definition{
+  {Slug:"ads",InstanceUUID:"uuid-a",BusinessPhoneE164:"5548996425287",
+   BusinessPhoneAliases:[]string{"554896425287"},Role:Ads,Enabled:true,
+   TokenEnv:"ADS_TOKEN",WebhookSecretEnv:"ADS_SECRET",AdsTriggers:[]string{"quero natal"}},
+  {Slug:"greeting",InstanceUUID:"uuid-b",BusinessPhoneE164:"554896425287",
+   Role:Greeting,Enabled:true,TokenEnv:"GREETING_TOKEN",WebhookSecretEnv:"GREET_SECRET"},
+ }
+ if _,err:=New(defs);err==nil{t.Fatal("paired JID overlapped another role")}
+ defs[1].BusinessPhoneE164="5548999999999"
+ reg,err:=New(defs)
+ if err!=nil{t.Fatal(err)}
+ e:=core.Envelope{Event:"Message",InstanceID:"uuid-a"}
+ e.Data.Info.ID="synthetic"
+ e.Data.Info.Chat="554896425287:15@s.whatsapp.net"
+ e.Data.Message.Conversation="quero natal"
+ d,err:=reg.Decide(e)
+ if err!=nil||d.Action!=core.Ignore||d.Reason!="own_business_number"{
+  t.Fatalf("verified own JID was not excluded from Ads: %+v %v",d,err)
+ }
+}
