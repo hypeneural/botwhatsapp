@@ -109,9 +109,9 @@ func main() {
 	if adsUUID != "" {
 		defs = append(defs, instances.Definition{
 			Slug: "ads", InstanceUUID: adsUUID,
-			BusinessPhoneE164: adsPhone,
+			BusinessPhoneE164:    adsPhone,
 			BusinessPhoneAliases: adsOwnAliases,
-			Role:              instances.Ads, Enabled: true, TokenEnv: "EVOLUTION_ADS_APIKEY",
+			Role:                 instances.Ads, Enabled: true, TokenEnv: "EVOLUTION_ADS_APIKEY",
 			WebhookSecretEnv: "BOT_ADS_WEBHOOK_SECRET",
 			AdsTriggers:      triggers, AdsFallback: false, CRMAllowed: true,
 		})
