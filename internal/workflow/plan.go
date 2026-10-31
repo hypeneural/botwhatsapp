@@ -16,7 +16,7 @@ const (
 	SendAdText        Step = "send_ad_text"
 	SendAdAudio       Step = "send_ad_audio"
 	SendAdDocument    Step = "send_ad_document"
-	SendAdClosingText Step = "send_ad_closing_text"
+	SendAdClosingText Step = "send_ad_closing_text" // legacy spool only: permanently suppressed, never scheduled
 	SendAdImage       Step = "send_ad_image_caption"
 	SendAdVideo       Step = "send_ad_video_caption"
 	ScheduleNatal     Step = "schedule_natal_crm"
@@ -36,7 +36,7 @@ type Plan struct {
 type Options struct {
 	AdReaction    bool
 	AdDocument    bool
-	AdClosingText bool
+	AdClosingText bool // deprecated: ignored; no message about forwarding to another number
 	AdImage       bool
 	AdVideo       bool
 	GreetingImage bool
@@ -56,9 +56,6 @@ func CreateWithOptions(d core.Decision, o Options) Plan {
 		steps = append(steps, SendAdText, SendAdAudio)
 		if o.AdDocument {
 			steps = append(steps, SendAdDocument)
-		}
-		if o.AdClosingText {
-			steps = append(steps, SendAdClosingText)
 		}
 		if o.AdImage {
 			steps = append(steps, SendAdImage)
