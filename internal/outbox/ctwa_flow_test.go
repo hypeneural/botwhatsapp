@@ -152,14 +152,13 @@ func TestAdSequenceWithDocumentAndClosingText(t *testing.T) {
 	}
 
 	pending, _, err := store.RecoverTasks()
-	if err != nil || len(pending) != 5 {
-		t.Fatalf("expected 5 tasks (text, audio, doc, closing, crm), got %d %v", len(pending), err)
+	if err != nil || len(pending) != 4 {
+		t.Fatalf("expected 4 tasks (text, audio, doc, crm), got %d %v", len(pending), err)
 	}
 	want := []workflow.Step{
 		workflow.SendAdText,
 		workflow.SendAdAudio,
 		workflow.SendAdDocument,
-		workflow.SendAdClosingText,
 		workflow.ScheduleNatal,
 	}
 	for i, p := range pending {
@@ -176,8 +175,8 @@ func TestAdSequenceWithDocumentAndClosingText(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if evo.textCalls != 2 {
-		t.Fatalf("expected 2 sent texts, got %d", evo.textCalls)
+	if evo.textCalls != 1 {
+		t.Fatalf("expected 1 sent text, got %d", evo.textCalls)
 	}
 	if evo.mediaCalls != 2 {
 		t.Fatalf("expected 2 sent media (audio, doc), got %d", evo.mediaCalls)
@@ -232,15 +231,14 @@ func TestAdReactionAndDocumentURLFlow(t *testing.T) {
 	}
 
 	pending, _, err := store.RecoverTasks()
-	if err != nil || len(pending) != 6 {
-		t.Fatalf("expected 6 tasks (reaction, text, audio, doc_url, closing, crm), got %d %v", len(pending), err)
+	if err != nil || len(pending) != 5 {
+		t.Fatalf("expected 5 tasks (reaction, text, audio, doc_url, crm), got %d %v", len(pending), err)
 	}
 	want := []workflow.Step{
 		workflow.SendAdReaction,
 		workflow.SendAdText,
 		workflow.SendAdAudio,
 		workflow.SendAdDocument,
-		workflow.SendAdClosingText,
 		workflow.ScheduleNatal,
 	}
 	for i, p := range pending {
@@ -263,8 +261,8 @@ func TestAdReactionAndDocumentURLFlow(t *testing.T) {
 	if len(evo.sentReacts) == 0 || evo.sentReacts[0] != "🎄" {
 		t.Fatalf("expected reaction 🎄, got %v", evo.sentReacts)
 	}
-	if evo.textCalls != 2 {
-		t.Fatalf("expected 2 sent texts, got %d", evo.textCalls)
+	if evo.textCalls != 1 {
+		t.Fatalf("expected 1 sent text, got %d", evo.textCalls)
 	}
 	if evo.mediaCalls != 2 {
 		t.Fatalf("expected 2 sent media (audio, doc_url), got %d", evo.mediaCalls)
