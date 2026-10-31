@@ -39,7 +39,7 @@ func NewWorker(cfg Config, store *Store, evolution EvolutionSender, crmScheduler
 		cfg.AdDocumentCaption = "Proposta de Natal 2026 - Estúdio Evydência"
 	}
 	if cfg.AdWelcomeText == "" {
-		cfg.AdWelcomeText = "Oii! Tudo bem? 🎄❤️ Que alegria receber seu contato! Vamos enviar a proposta de Natal 2026 por outro WhatsApp oficial do Estúdio Evidência."
+		cfg.AdWelcomeText = "Oii! Tudo bem? 🎄❤️ Que alegria receber seu contato! Conheça nossa proposta de Natal 2026 do Estúdio Evydência."
 	}
 	if cfg.GreetingCaption == "" {
 		cfg.GreetingCaption = "Olá! Seja bem-vindo ao Estúdio Evidência. Escolha uma das opções abaixo para continuarmos:\n1. Natal 2026\n2. Agendamentos\n3. Fotos e pedidos\n4. Localização\n5. Falar com atendente humano"
@@ -176,7 +176,6 @@ func (w *Worker) IngestDecision(d core.Decision) error {
 	plan := workflow.CreateWithOptions(d, workflow.Options{
 		AdReaction:    w.cfg.AdReactionEmoji != "",
 		AdDocument:    len(w.cfg.AdDocumentFixture) > 0 || strings.TrimSpace(w.cfg.AdDocumentURL) != "",
-		AdClosingText: strings.TrimSpace(w.cfg.AdClosingText) != "",
 		AdImage:       len(w.cfg.AdImageFixture) > 0,
 		AdVideo:       len(w.cfg.AdVideoFixture) > 0,
 		GreetingImage: len(w.cfg.GreetingImageFixture) > 0,
@@ -282,6 +281,13 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 			prev.Error == "ads flow cooldown cascade") {
 			return w.recordSuppressed(task.ID, "ads flow cooldown cascade")
 		}
+	}
+
+	// Previously queued closing texts promised contact from another number.
+	// Suppress BEFORE any provider I/O (even if an old task carries a payload).
+	// Suppressed is terminal, so a following CRM task may still complete.
+	if task.Step == workflow.SendAdClosingText {
+		return w.recordSuppressed(task.ID, "legacy closing message retired; no send")
 	}
 
 	// Check contact opt-out once more before starting attempt
@@ -455,14 +461,7 @@ func (w *Worker) ProcessTask(ctx context.Context, taskID string) error {
 		return w.recordConfirmed(task.ID, id)
 
 	case workflow.SendAdClosingText:
-		if sender == nil {
-			return w.recordUncertain(task.ID, "evolution sender not configured")
-		}
-		id, err := sender.SendText(ctx, task.RecipientJID, task.PayloadText)
-		if err != nil {
-			return w.recordUncertain(task.ID, err.Error())
-		}
-		return w.recordConfirmed(task.ID, id)
+		return w.recordSuppressed(task.ID, "legacy closing message retired; no send")
 
 	case workflow.ScheduleNatal:
 		return w.executeScheduleNatal(ctx, task)
