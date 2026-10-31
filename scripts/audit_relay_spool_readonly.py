@@ -12,7 +12,7 @@ from pathlib import Path
 import stat
 import sys
 
-def inspect(root: Path):
+def inspect(root: Path, max_events=None, max_bytes=None):
     if not root.is_dir() or root.is_symlink():
         raise ValueError("invalid_spool")
     counts = Counter()
@@ -63,20 +63,31 @@ def inspect(root: Path):
     if oldest:
         age = int((datetime.now(timezone.utc) - oldest).total_seconds())
     risk = counts["corrupt"] + counts["unsafe_permissions"] + counts["oversize"]
-    return {"status": "BLOCKED" if risk else "INVENTORY_ONLY",
-            "counts": dict(counts), "bytes": total_bytes,
-            "oldest_pending_age_seconds": age,
+    capacity = {}
+    if max_events is not None and max_events > 0:
+        capacity["event_count_limit"] = max_events
+        capacity["event_count_used_ratio"] = round(counts["records"] / max_events, 4)
+    if max_bytes is not None and max_bytes > 0:
+        capacity["byte_limit"] = max_bytes
+        capacity["bytes_used_ratio"] = round(total_bytes / max_bytes, 4)
+    saturation = any(value >= 0.90 for k, value in capacity.items()
+                     if k.endswith("_ratio"))
+    status = "BLOCKED" if risk else "CAPACITY_WARNING" if saturation else "INVENTORY_ONLY"
+    return {"status": status, "counts": dict(counts), "bytes": total_bytes,
+            "capacity": capacity, "oldest_pending_age_seconds": age,
             "delivery_proven": False, "runtime_contract_proven": False}
 
 
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--spool", required=True)
+    p.add_argument("--max-events", type=int, help="actual RELAY_MAX_EVENTS from runtime")
+    p.add_argument("--max-bytes", type=int, help="actual RELAY_MAX_SPOOL_BYTES from runtime")
     args = p.parse_args(argv)
     try:
-        result = inspect(Path(args.spool))
+        result = inspect(Path(args.spool), args.max_events, args.max_bytes)
         print(json.dumps(result, sort_keys=True))
-        return 2 if result["status"] == "BLOCKED" else 0
+        return 0 if result["status"] == "INVENTORY_ONLY" else 2
     except Exception as exc:
         print(json.dumps({"status": "BLOCKED", "reason": type(exc).__name__}))
         return 2
