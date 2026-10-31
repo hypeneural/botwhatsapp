@@ -1,5 +1,6 @@
 """Run with python3 -m unittest scripts/test_preflight_ctwa_account_switch.py -v."""
 import importlib.util
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -111,6 +112,7 @@ class AccountSwitchTests(unittest.TestCase):
             report=switch.inspect_previous_outbox(root,uuid)
             self.assertTrue(report["old_outbox_clear"])
 
+    @unittest.skipIf(os.name == "nt", "POSIX 0600 permission check: use WSL/VPS for private preflight")
     def test_private_input_refuses_world_readable_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/"env"
