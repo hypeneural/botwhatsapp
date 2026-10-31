@@ -142,7 +142,7 @@ O sistema encontra-se ativo e aguardando a execução do canário único de test
 Caso qualquer inconformidade seja observada:
 1. Reverter a URL do Webhook na Evolution GO via endpoint `/instance/connect` para:
    `http://whatsapp-status-status-engine-1:8050/webhook/evolution/evydencia`
-2. Parar o contêiner do Bot: `cd /srv/platform/stacks/botwhatsapp/deploy && docker compose -f compose.staging.yaml -f compose.override.yaml stop bot`
+2. **Não parar o contêiner do bot automaticamente.** Auditar confirmações do relay e outbox pendentes, preservando logs/volumes; uma parada cega pode interromper reconciliação e não restabelece o fluxo CTWA.
 3. O Status Engine volta imediatamente a receber eventos diretos, sem qualquer perda de histórico ou interferência em dados comerciais.
 
 ---
@@ -157,4 +157,4 @@ Solicitamos que a auditoria independente do ChatGPT audite e carimbe os seguinte
 - [x] **Segurança das Alterações de Código (PR #10):** Encerramento comercial aposentado, proteção contra autoacionamento via `IsFromMe` e supressão de fallback para mensagens orgânicas.
 - [x] **Deploy e Cutover Controlados:** Bot e Relay reconstruídos e saudáveis (`/healthz` 200 OK); webhook apontado para `relay-greeting:8790` com persistência durável `0600`.
 - [x] **Preservação Absoluta das Demais Stacks:** Zero alterações ou reinicializações no Evydência CRM, SmartDialer/Asterisk, Z-API, PrintServer ou Caddy.
-- [x] **Prontidão Operacional:** Ambiente 100% pronto para o canário consentido sem necessidade de novos desenvolvimentos.
+- [x] **Prontidão Operacional:** Prontidão condicionada: aguarda rotação das capacidades expostas, provas dos dois sinks, binding E.164/JID pareado, CI HEAD e canário autorizado.
