@@ -1,0 +1,100 @@
+"""Run with python3 -m unittest scripts/test_preflight_ctwa_account_switch.py -v."""
+import importlib.util
+from pathlib import Path
+import tempfile
+import unittest
+
+source = Path(__file__).with_name("preflight_ctwa_account_switch.py")
+spec = importlib.util.spec_from_file_location("ctwa_switch", source)
+switch = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(switch)
+
+
+def fixture():
+    uuid = "00000000-0000-4000-8000-000000000001"
+    phone = "5548999991234"
+    key = "A" * 35
+    secret = "S" * 40
+    bot = {
+        "BOT_ADS_PHONE": phone, "BOT_ADS_INSTANCE_UUID": uuid,
+        "EVOLUTION_ADS_APIKEY": key, "BOT_ADS_WEBHOOK_SECRET": secret,
+        "BOT_GREETING_PHONE": "", "BOT_GREETING_INSTANCE_UUID": "",
+    }
+    relay = {
+        "RELAY_ENABLED":"true", "RELAY_EXPECTED_INSTANCE_UUID":uuid,
+        "RELAY_BOT_URL":"http://bot:8788/webhook/ads/"+secret,
+        "RELAY_STATUS_URL":"http://status:8050/webhook/evolution/example",
+        "RELAY_INGRESS_SECRET":"R"*40,
+    }
+    inv = {"data":[{"name":"ads-example","id":uuid,"jid":phone+"@s.whatsapp.net",
+                   "connected":True,"token":key,"events":"MESSAGE,READ_RECEIPT",
+                   "webhook":"http://relay:8790/webhook/evolution/private"}]}
+    return bot,relay,inv
+
+
+class AccountSwitchTests(unittest.TestCase):
+    def test_complete_binding_is_ready_without_disclosing_secrets(self):
+        bot,relay,inv=fixture()
+        out=switch.verify_inventory(inv,bot,relay)
+        self.assertEqual(out["status"],"READY_FOR_AUTHORIZED_CUTOVER")
+        self.assertFalse(out["changes_performed"])
+        self.assertNotIn(bot["BOT_ADS_PHONE"],str(out))
+        self.assertNotIn(bot["EVOLUTION_ADS_APIKEY"],str(out))
+        self.assertFalse(out["provider_delivery_proven"])
+
+    def test_switch_to_other_valid_line_requires_matching_inventory_uuid(self):
+        bot,relay,inv=fixture()
+        previous=dict(bot,BOT_ADS_PHONE="5548996425287",
+                      BOT_ADS_INSTANCE_UUID="00000000-0000-4000-8000-000000000002")
+        out=switch.verify_inventory(inv,bot,relay,previous)
+        self.assertTrue(out["checks"]["phone_change_requested"])
+        self.assertTrue(out["checks"]["uuid_change_requested"])
+        self.assertEqual(out["status"],"READY_FOR_AUTHORIZED_CUTOVER")
+        bot["BOT_ADS_PHONE"]="5548999999999"
+        bad=switch.verify_inventory(inv,bot,relay,previous)
+        self.assertEqual(bad["status"],"BLOCKED_ACCOUNT_BINDING")
+        self.assertFalse(bad["checks"]["provider_phone_matches"])
+
+    def test_wrong_api_key_or_relay_or_shared_greeting_fails_closed(self):
+        bot,relay,inv=fixture()
+        for change in ("key","relay_uuid","relay_secret","same_greeting"):
+            b=dict(bot)
+            r=dict(relay)
+            if change=="key":b["EVOLUTION_ADS_APIKEY"]="B"*35
+            if change=="relay_uuid":r["RELAY_EXPECTED_INSTANCE_UUID"]="other"
+            if change=="relay_secret":r["RELAY_BOT_URL"]="http://bot:8788/webhook/ads/wrong"
+            if change=="same_greeting":b["BOT_GREETING_PHONE"]=b["BOT_ADS_PHONE"]
+            got=switch.verify_inventory(inv,b,r)
+            self.assertEqual(got["status"],"BLOCKED_ACCOUNT_BINDING",change)
+
+    def test_missing_provider_token_cannot_fake_verification(self):
+        bot,relay,inv=fixture()
+        del inv["data"][0]["token"]
+        got=switch.verify_inventory(inv,bot,relay)
+        self.assertEqual(got["status"],"BLOCKED_ACCOUNT_BINDING")
+        self.assertFalse(got["checks"]["api_key_verified"])
+
+    def test_duplicate_instance_uuid_is_blocked(self):
+        bot,relay,inv=fixture()
+        inv["data"].append(dict(inv["data"][0]))
+        got=switch.verify_inventory(inv,bot,relay)
+        self.assertFalse(got["checks"]["unique_provider_uuid"])
+
+    def test_private_input_refuses_world_readable_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/"env"
+            path.write_text("BOT_ADS_PHONE=5548999991234",encoding="utf-8")
+            path.chmod(0o644)
+            with self.assertRaises(ValueError):
+                switch.read_private(path)
+            path.chmod(0o600)
+            self.assertIn("BOT_ADS_PHONE",switch.read_private(path))
+
+    def test_env_parser_ignores_comments_and_invalid_keys(self):
+        raw="# comment\nBOT_ADS_PHONE=5548999991234\nnot-a-key=secret\n"
+        out=switch.parse_env(raw)
+        self.assertEqual(out,{"BOT_ADS_PHONE":"5548999991234"})
+
+
+if __name__=="__main__":
+    unittest.main()
