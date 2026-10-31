@@ -46,7 +46,12 @@ def parse_env(source):
 def from_jid(value):
     if not isinstance(value, str) or not value.endswith("@s.whatsapp.net"):
         return ""
-    number = value.split("@", 1)[0].split(":", 1)[0]
+    raw = value.split("@", 1)[0]
+    parts = raw.split(":")
+    if len(parts) > 2 or (len(parts) == 2 and
+            (not re.fullmatch(r"[0-9]{1,3}", parts[1]))):
+        return ""
+    number = parts[0]
     return number if E164_BR.fullmatch(number) else ""
 
 
@@ -67,7 +72,7 @@ def verify_live_instance_token(base_url, token, expected_phone):
     if not isinstance(status, dict):
         return False
     return (status.get("connected") is True
-            and status.get("loggedIn") is True
+            and status.get("loggedIn", True) is True
             and from_jid(status.get("myJid") or status.get("jid") or "") == expected_phone)
 
 
@@ -95,7 +100,19 @@ def verify_inventory(inventory, bot, relay, previous=None, provider_auth_proof=F
     ]
     checks["unique_provider_uuid"] = len(matching) == 1
     inst = matching[0] if len(matching) == 1 else {}
-    checks["provider_phone_matches"] = from_jid(inst.get("jid") or inst.get("myJid") or "") == phone
+    paired_jid = bot.get("BOT_ADS_PAIRED_JID", "")
+    paired_phone = from_jid(paired_jid) if paired_jid else phone
+    checks["paired_jid_valid"] = (not paired_jid or bool(from_jid(paired_jid)))
+    # The provider's registered JID may differ from the advertised E.164
+    # in Brazil. Only an explicit, verified paired JID can bridge them.
+    checks["provider_phone_matches"] = (
+        bool(paired_phone) and
+        from_jid(inst.get("jid") or inst.get("myJid") or "") == paired_phone
+    )
+    checks["paired_alias_separate_from_greeting"] = (
+        not bot.get("BOT_GREETING_PHONE") or
+        paired_phone != bot.get("BOT_GREETING_PHONE")
+    )
     checks["provider_connected"] = inst.get("connected") is True
     provider_key = inst.get("token")
     inventory_key_verified = isinstance(provider_key, str) and bool(api_key) and hmac.compare_digest(
@@ -183,7 +200,7 @@ def main(argv=None):
             provider_auth_proof = verify_live_instance_token(
                 args.provider_base_url,
                 bot.get("EVOLUTION_ADS_APIKEY", ""),
-                bot.get("BOT_ADS_PHONE", ""),
+                from_jid(bot.get("BOT_ADS_PAIRED_JID", "")) or bot.get("BOT_ADS_PHONE", ""),
             )
         result = verify_inventory(
             inventory, bot, relay, previous=prev, provider_auth_proof=provider_auth_proof)
@@ -202,7 +219,7 @@ def main(argv=None):
         # Identity/preflight success never authorizes a webhook change by itself.
         result["deployment_authorized"] = False
         print(json.dumps(result, sort_keys=True))
-        return 0 if result["status"] == "READY_FOR_AUTHORIZED_CUTOVER" else 2
+        return 0 if result["status"] == "PASS_BINDINGS_ONLY" else 2
     except Exception as e:
         print(json.dumps({"status": "BLOCKED_ACCOUNT_BINDING", "reason": type(e).__name__}))
         return 2
