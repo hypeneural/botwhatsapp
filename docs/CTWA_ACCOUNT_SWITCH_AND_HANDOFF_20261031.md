@@ -63,6 +63,23 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate-ctwa-hand
 
 Testar o **HEAD da PR #10**, além de `git status --short`, workflow CI e digest. Não rodar canário externo sem autorização; nem reprocessar 29–31/10. Preserve `BOT_ADS_FLOW_COOLDOWN_HOURS`, telefones e históricos de opt-out.
 
+## Desempenho e capacidade do relay — melhoria aplicada
+
+- `internal/relay/store.go::Pending()` fazia `ReadDir + ReadFile` em **todos** os JSON a cada 30 segundos, mesmo para eventos antigos completamente entregues. O dossiê reportou **19.069 tombstones concluídos, 0 pendentes**, portanto o custo teórico seria cerca de 2,3 milhões de leituras de arquivos por hora se a contagem permanecesse estável. **Isso não é um benchmark real de latência**, mas é o comportamento confirmado pelo código anterior.
+- Agora `NewStoreWithLimits` reconstrói **uma única vez** um índice em memória somente dos receipts ainda não concluídos, conferindo identidade e JSON do spool. `write()` mantém o índice sincronizado com o registro durável depois da renomeação atômica e antes do fsync do diretório; `Pending()` visita apenas os pendentes e preserva ordenação determinística. Após restart, o índice vem dos arquivos, **nunca é fonte de verdade independente**. Somente um processo pode ser dono do volume. Não remover tombstones nem dedupe.
+- `scripts/audit_relay_spool_readonly.py` agora aceita os limites **reais** para emitir `CAPACITY_WARNING` se slots ou bytes ocuparem 90% ou mais; é erro de preflight (exit 2), não uma limpeza.
+- O `.env.example` tem `RELAY_MAX_EVENTS=20000`. **Se** este for o limite efetivo da VPS, 19.069/20.000 representam **95,345% dos slots**. Isso deve ser validado no Compose/env privado antes de restaurar webhook. Não aumentar capacidade cegamente sem conferir free space, total de JSON, TTL e política de tombstones de 7 dias.
+
+```bash
+# Somente leitura; informar LIMITES VERIFICADOS da VPS:
+python3 scripts/audit_relay_spool_readonly.py \
+  --spool /VOLUME_REAL_RELAYER \
+  --max-events 20000 \
+  --max-bytes 134217728
+```
+
+**Atenção:** os dois valores acima são EXEMPLOS do `.env.example`; Antigravity deve substituí-los pelos valores efetivos da VPS. Se retornar `CAPACITY_WARNING`, não realizar o cutover até revisar limites, capacidade física, retenção e recibo de rollback. Não apagar arquivos completos só para ter espaço; tombstones preservam idempotência.
+
 ## Melhorias futuras (fora do hotfix, NÃO refatorar agora)
 
 - Inventário privado de instâncias na interface gerencial mostrando somente rótulo e os últimos 4 dígitos, com mudança proposta via duas fases e auditoria, **sem expor APIKEY nem modificar provider pelo browser**.
