@@ -150,7 +150,7 @@ def inspect_previous_outbox(tasks_dir, old_uuid):
         if item.suffix != ".json":
             continue
         info = item.lstat()
-        if not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077 or info.st_size > 512 * 1024:
+        if not stat.S_ISREG(info.st_mode) or (sys.platform != 'win32' and info.st_mode & 0o077) or info.st_size > 512 * 1024:
             raise ValueError("outbox_record_unsafe")
         row = json.loads(item.read_text(encoding="utf-8"))
         scanned += 1
