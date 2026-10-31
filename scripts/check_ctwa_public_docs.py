@@ -15,9 +15,7 @@ DOCUMENTS = [
     "docs/RECIBO_ANTIGRAVITY_CTWA_NUMBER_SWITCH_20261031.md",
     "docs/CTWA_POST_CUTOVER_GATES_20261031.md",
 ]
-SECRET_URL = re.compile(
-    r"/webhook/(?:evolution|ads)/[0-9a-fA-F]{32,}(?=[\\s\\)\\`\\\"'/?#]|$)"
-)
+SECRET_URL = re.compile(r"/webhook/(?:evolution|ads)/[0-9a-fA-F]{32,}")
 
 
 def check(root=ROOT):
