@@ -8,6 +8,9 @@ on:
       - 'internal/**'
       - 'config/**'
       - 'scripts/**'
+      - 'docs/CTWA_POST_CUTOVER_GATES_20261031.md'
+      - 'docs/AUDITORIA_VALIDACAO_CHATGPT_P0_20261031.md'
+      - 'docs/RECIBO_ANTIGRAVITY_CTWA_NUMBER_SWITCH_20261031.md'
       - 'deploy/caddy/**'
       - 'testdata/**'
       - '.github/workflows/go-test.yml'
@@ -18,6 +21,9 @@ on:
       - 'cmd/**'
       - 'internal/**'
       - 'scripts/**'
+      - 'docs/CTWA_POST_CUTOVER_GATES_20261031.md'
+      - 'docs/AUDITORIA_VALIDACAO_CHATGPT_P0_20261031.md'
+      - 'docs/RECIBO_ANTIGRAVITY_CTWA_NUMBER_SWITCH_20261031.md'
       - 'deploy/caddy/**'
       - '.github/workflows/go-test.yml'
 concurrency:
@@ -48,6 +54,8 @@ jobs:
       - run: python3 -m unittest scripts/test_relay_forensic_readonly.py -v
       - run: python3 -m py_compile scripts/preflight_ctwa_account_switch.py
       - run: python3 -m unittest scripts/test_preflight_ctwa_account_switch.py -v
+      - run: python3 scripts/check_ctwa_public_docs.py
+      - run: python3 -m unittest scripts/test_check_ctwa_public_docs.py -v
       # Concurrency guard for the journal, policy updates and webhook fan-out.
       # Runs once per code change; no network calls or production credentials.
       - run: go test -race -count=1 ./internal/outbox ./internal/ingress ./internal/relay
