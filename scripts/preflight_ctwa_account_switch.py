@@ -15,6 +15,7 @@ import re
 import stat
 import sys
 from urllib.parse import urlsplit
+from urllib.request import Request, urlopen
 
 E164_BR = re.compile(r"^55[0-9]{10,11}$")
 UUID_RE = re.compile(r"^[A-Za-z0-9-]{8,128}$")
@@ -49,7 +50,28 @@ def from_jid(value):
     return number if E164_BR.fullmatch(number) else ""
 
 
-def verify_inventory(inventory, bot, relay, previous=None):
+def verify_live_instance_token(base_url, token, expected_phone):
+    """Read-only GET authenticated with candidate token; only local Evolution."""
+    u = urlsplit(base_url)
+    if (u.scheme != "http" or u.hostname not in ("127.0.0.1", "localhost")
+            or u.username or u.password or u.query or u.fragment):
+        raise ValueError("provider_url_must_be_local")
+    req = Request(base_url.rstrip("/") + "/instance/status",
+                  headers={"apikey":token, "Accept":"application/json"},
+                  method="GET")
+    with urlopen(req, timeout=6) as response:
+        if response.status != 200:
+            return False
+        content = json.load(response)
+    status = content.get("data", content) if isinstance(content, dict) else {}
+    if not isinstance(status, dict):
+        return False
+    return (status.get("connected") is True
+            and status.get("loggedIn") is True
+            and from_jid(status.get("myJid") or status.get("jid") or "") == expected_phone)
+
+
+def verify_inventory(inventory, bot, relay, previous=None, provider_auth_proof=False):
     checks = {}
     phone = bot.get("BOT_ADS_PHONE", "")
     uuid = bot.get("BOT_ADS_INSTANCE_UUID", "")
@@ -76,10 +98,11 @@ def verify_inventory(inventory, bot, relay, previous=None):
     checks["provider_phone_matches"] = from_jid(inst.get("jid") or inst.get("myJid") or "") == phone
     checks["provider_connected"] = inst.get("connected") is True
     provider_key = inst.get("token")
-    checks["api_key_verified"] = isinstance(provider_key, str) and bool(api_key) and hmac.compare_digest(
+    inventory_key_verified = isinstance(provider_key, str) and bool(api_key) and hmac.compare_digest(
         hashlib.sha256(provider_key.encode()).digest(),
         hashlib.sha256(api_key.encode()).digest()
     )
+    checks["api_key_verified"] = inventory_key_verified or bool(provider_auth_proof)
     # Some provider builds deliberately omit the token in GET /instance/all.
     # A missing value does NOT prove the credential is valid.
     checks["relay_uuid_matches"] = relay.get("RELAY_EXPECTED_INSTANCE_UUID") == uuid
@@ -102,7 +125,7 @@ def verify_inventory(inventory, bot, relay, previous=None):
         # A phone change without a new provider UUID might indicate spoofing
         # or a changed JID; provider inventory still decides eligibility.
     result = {
-        "status": ("READY_FOR_AUTHORIZED_CUTOVER" if all(
+        "status": ("PASS_BINDINGS_ONLY" if all(
             value for key, value in checks.items()
             if key not in ("phone_change_requested", "uuid_change_requested")
         ) else "BLOCKED_ACCOUNT_BINDING"),
@@ -144,6 +167,9 @@ def main(argv=None):
     p.add_argument("--relay-env", required=True)
     p.add_argument("--inventory-json", required=True)
     p.add_argument("--previous-bot-env")
+    p.add_argument("--verify-live-status", action="store_true",
+                   help="GET /instance/status using candidate APIKEY on local Evolution, never POST")
+    p.add_argument("--provider-base-url", default="http://127.0.0.1:14000")
     p.add_argument("--outbox-tasks-dir",
                    help="Required with --previous-bot-env for an account change; read-only.")
     args = p.parse_args(argv)
@@ -152,7 +178,15 @@ def main(argv=None):
         relay = parse_env(read_private(args.relay_env))
         inventory = read_private(args.inventory_json, as_json=True)
         prev = parse_env(read_private(args.previous_bot_env)) if args.previous_bot_env else None
-        result = verify_inventory(inventory, bot, relay, previous=prev)
+        provider_auth_proof = False
+        if args.verify_live_status:
+            provider_auth_proof = verify_live_instance_token(
+                args.provider_base_url,
+                bot.get("EVOLUTION_ADS_APIKEY", ""),
+                bot.get("BOT_ADS_PHONE", ""),
+            )
+        result = verify_inventory(
+            inventory, bot, relay, previous=prev, provider_auth_proof=provider_auth_proof)
         changed = prev is not None and (
             prev.get("BOT_ADS_PHONE") != bot.get("BOT_ADS_PHONE") or
             prev.get("BOT_ADS_INSTANCE_UUID") != bot.get("BOT_ADS_INSTANCE_UUID"))
