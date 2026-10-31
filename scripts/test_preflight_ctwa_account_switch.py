@@ -1,5 +1,8 @@
 """Run with python3 -m unittest scripts/test_preflight_ctwa_account_switch.py -v."""
 import importlib.util
+import contextlib
+import io
+import json
 import os
 from pathlib import Path
 import tempfile
@@ -42,6 +45,42 @@ class AccountSwitchTests(unittest.TestCase):
         self.assertNotIn(bot["BOT_ADS_PHONE"],str(out))
         self.assertNotIn(bot["EVOLUTION_ADS_APIKEY"],str(out))
         self.assertFalse(out["provider_delivery_proven"])
+
+    def test_registered_jid_device_alias_requires_explicit_evidence(self):
+        bot, relay, inv = fixture()
+        bot["BOT_ADS_PHONE"] = "5548996425287"
+        inv["data"][0]["jid"] = "554896425287:15@s.whatsapp.net"
+        out=switch.verify_inventory(inv,bot,relay)
+        self.assertEqual(out["status"],"BLOCKED_ACCOUNT_BINDING")
+        bot["BOT_ADS_PAIRED_JID"] = "554896425287:15@s.whatsapp.net"
+        out=switch.verify_inventory(inv,bot,relay)
+        self.assertEqual(out["status"],"PASS_BINDINGS_ONLY")
+        self.assertTrue(out["checks"]["paired_jid_valid"])
+        self.assertFalse(out["changes_performed"])
+        bot["BOT_ADS_PAIRED_JID"] = "554896425287:15:extra@s.whatsapp.net"
+        out=switch.verify_inventory(inv,bot,relay)
+        self.assertEqual(out["status"],"BLOCKED_ACCOUNT_BINDING")
+
+    @unittest.skipIf(os.name == "nt", "Private mode 0600 gate runs on POSIX/WSL")
+    def test_successful_cli_returns_zero_and_never_logs_phone(self):
+        bot,relay,inv=fixture()
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            def private_file(name,data):
+                path=root/name
+                path.write_text(data,encoding="utf-8")
+                path.chmod(0o600)
+                return str(path)
+            a=private_file("bot.env","\\n".join(f"{k}={v}" for k,v in bot.items()))
+            b=private_file("relay.env","\\n".join(f"{k}={v}" for k,v in relay.items()))
+            j=private_file("instances.json",json.dumps(inv))
+            output=io.StringIO()
+            with contextlib.redirect_stdout(output):
+                code=switch.main(["--bot-env",a,"--relay-env",b,"--inventory-json",j])
+            self.assertEqual(code,0)
+            self.assertEqual(json.loads(output.getvalue())["status"],"PASS_BINDINGS_ONLY")
+            self.assertNotIn(bot["BOT_ADS_PHONE"],output.getvalue())
+            self.assertNotIn(bot["EVOLUTION_ADS_APIKEY"],output.getvalue())
 
     def test_switch_to_other_valid_line_requires_matching_inventory_uuid(self):
         bot,relay,inv=fixture()
