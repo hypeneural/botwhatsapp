@@ -46,6 +46,8 @@ jobs:
       - run: bash -n scripts/audit-ctwa-dns-readonly.sh
       - run: python3 -m py_compile scripts/audit_relay_spool_readonly.py scripts/preflight_evolution_relay_contract_readonly.py
       - run: python3 -m unittest scripts/test_relay_forensic_readonly.py -v
+      - run: python3 -m py_compile scripts/preflight_ctwa_account_switch.py
+      - run: python3 -m unittest scripts/test_preflight_ctwa_account_switch.py -v
       # Concurrency guard for the journal, policy updates and webhook fan-out.
       # Runs once per code change; no network calls or production credentials.
       - run: go test -race -count=1 ./internal/outbox ./internal/ingress ./internal/relay
