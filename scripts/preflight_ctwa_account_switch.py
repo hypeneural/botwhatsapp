@@ -116,12 +116,36 @@ def verify_inventory(inventory, bot, relay, previous=None):
     return result
 
 
+def inspect_previous_outbox(tasks_dir, old_uuid):
+    """Count unresolved tasks from the former Ads instance, without PII."""
+    root = Path(tasks_dir)
+    if not root.is_dir() or root.is_symlink():
+        raise ValueError("outbox_directory_invalid")
+    unresolved = 0
+    scanned = 0
+    for item in root.iterdir():
+        if item.suffix != ".json":
+            continue
+        info = item.lstat()
+        if not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077 or info.st_size > 512 * 1024:
+            raise ValueError("outbox_record_unsafe")
+        row = json.loads(item.read_text(encoding="utf-8"))
+        scanned += 1
+        if row.get("instance_id") == old_uuid and row.get("state") in (
+                "pending", "attempt_started", "uncertain"):
+            unresolved += 1
+    return {"unresolved_previous_ads_tasks": unresolved,
+            "tasks_scanned": scanned, "old_outbox_clear": unresolved == 0}
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--bot-env", required=True)
     p.add_argument("--relay-env", required=True)
     p.add_argument("--inventory-json", required=True)
     p.add_argument("--previous-bot-env")
+    p.add_argument("--outbox-tasks-dir",
+                   help="Required with --previous-bot-env for an account change; read-only.")
     args = p.parse_args(argv)
     try:
         bot = parse_env(read_private(args.bot_env))
@@ -129,6 +153,20 @@ def main(argv=None):
         inventory = read_private(args.inventory_json, as_json=True)
         prev = parse_env(read_private(args.previous_bot_env)) if args.previous_bot_env else None
         result = verify_inventory(inventory, bot, relay, previous=prev)
+        changed = prev is not None and (
+            prev.get("BOT_ADS_PHONE") != bot.get("BOT_ADS_PHONE") or
+            prev.get("BOT_ADS_INSTANCE_UUID") != bot.get("BOT_ADS_INSTANCE_UUID"))
+        if changed:
+            if not args.outbox_tasks_dir:
+                result["status"] = "BLOCKED_PREVIOUS_OUTBOX_NOT_AUDITED"
+            else:
+                queue = inspect_previous_outbox(
+                    args.outbox_tasks_dir, prev.get("BOT_ADS_INSTANCE_UUID", ""))
+                result.update(queue)
+                if not queue["old_outbox_clear"]:
+                    result["status"] = "BLOCKED_PREVIOUS_OUTBOX_UNRESOLVED"
+        # Identity/preflight success never authorizes a webhook change by itself.
+        result["deployment_authorized"] = False
         print(json.dumps(result, sort_keys=True))
         return 0 if result["status"] == "READY_FOR_AUTHORIZED_CUTOVER" else 2
     except Exception as e:
