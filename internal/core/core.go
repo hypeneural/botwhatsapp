@@ -37,6 +37,7 @@ type Config struct {
  AdsTriggers []string
  AdsFallback bool // legacy only; ads no longer auto-greet on unmatched text
  BusinessPhoneE164 string // verified own line: never a customer
+ BusinessPhoneAliases []string // explicitly verified alternative own-line JIDs; NEVER inferred by deleting Brazilian ninth digit
 }
 type Action string
 const (
@@ -78,8 +79,25 @@ func JIDPhone(chat string) (string,bool) {
  suffix:="@s.whatsapp.net"
  if !strings.HasSuffix(chat,suffix) {return "",false}
  value:=strings.TrimSuffix(chat,suffix)
+ // Whatsmeow device-bearing JIDs can be e.g. <phone>:15@s.whatsapp.net.
+ // The device suffix is metadata, not part of the E.164 identity. Reject
+ // malformed device forms and NEVER synthesize/delete a Brazilian ninth digit.
+ if strings.Contains(value,":") {
+  parts:=strings.Split(value,":")
+  if len(parts)!=2||len(parts[1])<1||len(parts[1])>3||!digits.MatchString(parts[1]) {return "",false}
+  value=parts[0]
+ }
  if len(value)<12 || len(value)>13 || !strings.HasPrefix(value,"55") || !digits.MatchString(value) {return "",false}
  return value,true
+}
+
+func IsOwnBusinessPhone(phone string,c Config) bool {
+ if phone=="" {return false}
+ if c.BusinessPhoneE164!=""&&phone==c.BusinessPhoneE164 {return true}
+ for _,alias:=range c.BusinessPhoneAliases {
+  if alias!=""&&phone==alias {return true}
+ }
+ return false
 }
 func CRMPhone(e164 string)(string,bool) {
  if !strings.HasPrefix(e164,"55"){return "",false}
@@ -116,7 +134,7 @@ func Select(e Envelope,c Config) Decision {
  if !ok {d.Reason="unresolved_phone_or_non_private_chat";return d}
  // A looped/self-chat may be delivered with IsFromMe=false. Never treat
  // the official business number as a lead, even on an exact ad phrase.
- if c.BusinessPhoneE164!="" && phone==c.BusinessPhoneE164 {
+ if IsOwnBusinessPhone(phone,c) {
   d.Reason="own_business_number";return d
  }
  d.PhoneE164=phone
@@ -125,7 +143,7 @@ func Select(e Envelope,c Config) Decision {
  // IsFromMe flag is inconsistent. An explicitly verified sender JID equal
  // to this instance's official line is outbound evidence, never a lead.
  senderPhone,senderVerified:=JIDPhone(e.Data.Info.Sender)
- if e.Data.Info.IsFromMe || (senderVerified && senderPhone==c.BusinessPhoneE164 && c.BusinessPhoneE164!="") {
+ if e.Data.Info.IsFromMe || (senderVerified && IsOwnBusinessPhone(senderPhone,c)) {
   // Outbound activity is a suppressor for future automatic greetings.
   // Never enqueue a reply or a CRM proposal from the echo itself.
   d.Action=OutboundObserved
