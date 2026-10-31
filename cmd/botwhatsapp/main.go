@@ -81,6 +81,23 @@ func main() {
 			log.Fatal(err)
 		}
 	}
+	// This optional alias is the JID actually paired in Evolution/Whatsmeow,
+	// captured by read-only provider inventory. Do not silently remove/add '9'.
+	// It protects own-message echoes if the publicly advertised E.164 differs
+	// from the WhatsApp registered JID. An alias is never used as a lead phone.
+	var adsOwnAliases []string
+	if adsUUID != "" && strings.TrimSpace(os.Getenv("BOT_ADS_PAIRED_JID")) != "" {
+		paired, ok := core.JIDPhone(strings.TrimSpace(os.Getenv("BOT_ADS_PAIRED_JID")))
+		if !ok {
+			log.Fatal("BOT_ADS_PAIRED_JID must be an explicitly verified WhatsApp phone JID")
+		}
+		if paired != adsPhone {
+			adsOwnAliases = []string{paired}
+		}
+		if greetingPhone != "" && paired == greetingPhone {
+			log.Fatal("paired Ads JID cannot equal Greeting business number")
+		}
+	}
 
 	defs := make([]instances.Definition, 0, 2)
 	secrets := make(map[string]string)
@@ -93,6 +110,7 @@ func main() {
 		defs = append(defs, instances.Definition{
 			Slug: "ads", InstanceUUID: adsUUID,
 			BusinessPhoneE164: adsPhone,
+			BusinessPhoneAliases: adsOwnAliases,
 			Role:              instances.Ads, Enabled: true, TokenEnv: "EVOLUTION_ADS_APIKEY",
 			WebhookSecretEnv: "BOT_ADS_WEBHOOK_SECRET",
 			AdsTriggers:      triggers, AdsFallback: false, CRMAllowed: true,
