@@ -1,6 +1,12 @@
 # Índice — documentação vigente vs histórico
 
-## COMEÇAR AQUI (canonical)
+## PÓS-CUTOVER — FONTE CANÔNICA MAIS RECENTE (31/10/2026)
+- [Prompt Antigravity pós-cutover](PROMPT_ANTIGRAVITY_CTWA_POST_CUTOVER_20261031.md) — roteiro exato: validar CI, digest de imagens, Event/JID real, rotação de segredos, ACKs por destino e canário controlado. **Sem novos POSTs de produção nesta etapa.**
+- [Auditoria forense pós-cutover](CTWA_POST_CUTOVER_GATES_20261031.md) — fatos de código, distinção entre relatório do Antigravity e prova de runtime, perigos do caminho bearer exposto e rollback seguro.
+- [Recibo Antigravity 31/10](RECIBO_ANTIGRAVITY_CTWA_NUMBER_SWITCH_20261031.md) — histórico redigido; relatou cutover e rebuild, mas NÃO comprova canário.
+- [Dossiê de execução 31/10](AUDITORIA_VALIDACAO_CHATGPT_P0_20261031.md) — diagnóstico histórico agora com URLs privadas redigidas.
+
+## COMEÇAR AQUI (canonical — documentos anteriores)
 - [Gates P0 de implantação real somente do bot](RELEASE-BOT-CTWA-5287-20261027.md): inventário Contabo, preflight privado sem segredos, backup do journal, um worker/canário e rollback do binário. **Não usar Compose staging.**
 - [Painel do gestor (mobile + preview local)](PAINEL-GESTOR-CTWA-20261027.md): filtros compreensíveis, recibos, significado dos estados e homologação visual offline de 5 cenários. Fluxo recomendado para gestor e Antigravity.
 - [Hotfix CTWA 5287 → CRM V4 + histórico auditável](CTWA-NATIVE-HANDOFF-20261027.md): PR #10 Draft, gateway nativo, eventos, recibos, segurança e script offline `scripts/validate-ctwa-handoff-local.ps1`. Fonte operacional atual; não usar API batch 415/416.
