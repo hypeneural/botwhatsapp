@@ -45,6 +45,9 @@ type ContactState struct {
 	PhoneE164      string    `json:"phone_e164"`
 	LastGreetingAt time.Time `json:"last_greeting_at,omitempty"`
 	LastAdsFlowAt  time.Time `json:"last_ads_flow_at,omitempty"`
+	LastInboundAt  time.Time `json:"last_inbound_at,omitempty"`
+	LastOutboundAt time.Time `json:"last_outbound_at,omitempty"`
+	LastActivityAt time.Time `json:"last_activity_at,omitempty"`
 	HumanPaused    bool      `json:"human_paused"`
 	HumanPausedAt  time.Time `json:"human_paused_at,omitempty"`
 	OptOut         bool      `json:"opt_out"`
@@ -58,6 +61,7 @@ type Config struct {
 	AdsFlowCooldown          time.Duration
 	CRMInstanceID            *int
 	OperationalAuthorization bool
+	NativeProposalScheduler  NativeProposalScheduler
 	GreetingCaption          string
 	AdReactionEmoji          string
 	AdWelcomeText            string
@@ -86,6 +90,10 @@ type EvolutionSender interface {
 	SendDocument(ctx context.Context, phone string, file []byte, filename string) (string, error)
 	SendDocumentURL(ctx context.Context, phone, documentURL, filename, caption string) (string, error)
 	SendReaction(ctx context.Context, phone, messageID, reaction string) (string, error)
+}
+
+type NativeProposalScheduler interface {
+	ScheduleNative(ctx context.Context, nationalPhone, requestID string) (string, error)
 }
 
 type CRMScheduler interface {

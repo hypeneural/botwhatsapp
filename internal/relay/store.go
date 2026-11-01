@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -39,6 +40,9 @@ type Store struct {
 	count int
 	maxBytes int64
 	usedBytes int64
+	// Rebuilt from the durable records once at startup. Only uncompleted
+	// receipts live here: the 30-second retry sweep never rereads tombstones.
+	pending map[string]time.Time
 }
 
 func NewStore(dir string, max int) (*Store,error) {
@@ -53,15 +57,26 @@ func NewStoreWithLimits(dir string,max int,maxBytes int64)(*Store,error){
 	if err!=nil{return nil,err}
 	n:=0
 	var bytesUsed int64
+	pending:=make(map[string]time.Time)
 	for _,e:=range entries {
 		if !e.IsDir()&&strings.HasSuffix(e.Name(),".json"){
 			info,err:=e.Info()
 			if err!=nil{return nil,err}
+			if !info.Mode().IsRegular(){return nil,errors.New("relay: non-regular spool entry")}
 			n++;bytesUsed+=info.Size()
+			if n>max||bytesUsed>maxBytes{return nil,ErrFull}
+			// Hydrate the retry index from DISK after restart. A malformed
+			// durable receipt must block the worker rather than lose delivery.
+			raw,err:=os.ReadFile(filepath.Join(dir,e.Name()))
+			if err!=nil{return nil,err}
+			var rec Record
+			if json.Unmarshal(raw,&rec)!=nil||rec.Key+".json"!=e.Name(){
+				return nil,errors.New("relay: corrupt spool")
+			}
+			if rec.CompletedAt.IsZero(){pending[rec.Key]=rec.NextAttempt}
 		}
 	}
-	if n>max||bytesUsed>maxBytes{return nil,ErrFull}
-	return &Store{dir:dir,max:max,count:n,maxBytes:maxBytes,usedBytes:bytesUsed},nil
+	return &Store{dir:dir,max:max,count:n,maxBytes:maxBytes,usedBytes:bytesUsed,pending:pending},nil
 }
 
 func EventKey(body []byte, expectedUUID string)(string,error){
@@ -107,6 +122,11 @@ func (s *Store) write(rec Record)error{
 	if old,err:=os.Stat(path);err==nil{priorSize=old.Size()}else if !os.IsNotExist(err){return err}
 	if err=os.Rename(f.Name(),path);err!=nil{return err}
 	s.usedBytes+=int64(len(raw))-priorSize
+	// Keep the cache aligned with the renamed on-disk receipt, including
+	// when a later directory fsync reports uncertainty. No replay happens
+	// without consulting this record during Process.
+	if s.pending==nil{s.pending=make(map[string]time.Time)}
+	if rec.CompletedAt.IsZero(){s.pending[rec.Key]=rec.NextAttempt}else{delete(s.pending,rec.Key)}
 	if runtime.GOOS!="windows" {
 		d,err:=os.Open(s.dir)
 		if err!=nil{return err}
@@ -161,18 +181,15 @@ func (s *Store) Postpone(key string,until time.Time)error{
 	if r.CompletedAt.IsZero(){r.NextAttempt=until.UTC()}
 	return s.write(r)
 }
+// Pending selects due receipts from a synchronized, disk-derived index.
+// This is O(active pending), not O(all 7-day completed tombstones) every 30s.
 func(s *Store) Pending(now time.Time)([]string,error){
 	s.mu.Lock();defer s.mu.Unlock()
-	entries,err:=os.ReadDir(s.dir);if err!=nil{return nil,err}
-	keys:=make([]string,0)
-	for _,e:=range entries{
-		if e.IsDir()||!strings.HasSuffix(e.Name(),".json"){continue}
-		b,err:=os.ReadFile(filepath.Join(s.dir,e.Name()))
-		if err!=nil{return nil,err}
-		var r Record
-		if json.Unmarshal(b,&r)!=nil||r.Key+".json"!=e.Name(){return nil,errors.New("relay: corrupt spool")}
-		if r.CompletedAt.IsZero()&&(r.NextAttempt.IsZero()||!now.Before(r.NextAttempt)){keys=append(keys,r.Key)}
+	keys:=make([]string,0,len(s.pending))
+	for key,next:=range s.pending{
+		if next.IsZero()||!now.Before(next){keys=append(keys,key)}
 	}
+	sort.Strings(keys) // Preserve os.ReadDir's deterministic key order.
 	return keys,nil
 }
 // Prune only completed records with scrubbed bodies, retaining dedup tombstones
@@ -190,7 +207,7 @@ func(s *Store) PruneCompleted(before time.Time)(int,error){
 		if !r.CompletedAt.IsZero()&&r.CompletedAt.Before(before)&&len(r.Body)==0{
 			info,err:=os.Stat(path);if err!=nil{return n,err}
 			if err:=os.Remove(path);err!=nil{return n,err}
-			s.count--;s.usedBytes-=info.Size();n++
+			s.count--;s.usedBytes-=info.Size();delete(s.pending,r.Key);n++
 		}
 	}
 	return n,nil

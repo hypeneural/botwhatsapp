@@ -1,5 +1,8 @@
 # CRM Evidência — contrato verificado em main (21/10/2026)
 
+> **LEGADO / SOMENTE REFERÊNCIA FORENSE:** em 26/10/2026 o CRM passou a rejeitar campanhas individuais Natal 415/416 via `POST /api/campaigns/schedule/execute` com HTTP 422. O hotfix vigente da PR #10 exige `POST /api/v1/extension/proposals/schedule` com Sanctum `extension:proposal-write` e recibo nativo. **NÃO executar nem configurar o endpoint abaixo para o bot atual.** Ler [CTWA-NATIVE-HANDOFF-20261027.md](CTWA-NATIVE-HANDOFF-20261027.md).
+
+
 **ESCOPO**: consumidor HTTP em `botwhatsapp`. O repositório `hypeneural/evydencia-crm` é somente leitura; não instalar/alterar nada nele. Este documento é uma revisão estática de código, não prova de agendamento na produção.
 
 ## 1. Rota e autenticação

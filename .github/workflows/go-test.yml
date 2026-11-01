@@ -7,6 +7,11 @@ on:
       - 'cmd/**'
       - 'internal/**'
       - 'config/**'
+      - 'scripts/**'
+      - 'docs/CTWA_POST_CUTOVER_GATES_20261031.md'
+      - 'docs/AUDITORIA_VALIDACAO_CHATGPT_P0_20261031.md'
+      - 'docs/RECIBO_ANTIGRAVITY_CTWA_NUMBER_SWITCH_20261031.md'
+      - 'deploy/caddy/**'
       - 'testdata/**'
       - '.github/workflows/go-test.yml'
   pull_request:
@@ -15,6 +20,11 @@ on:
       - 'Dockerfile'
       - 'cmd/**'
       - 'internal/**'
+      - 'scripts/**'
+      - 'docs/CTWA_POST_CUTOVER_GATES_20261031.md'
+      - 'docs/AUDITORIA_VALIDACAO_CHATGPT_P0_20261031.md'
+      - 'docs/RECIBO_ANTIGRAVITY_CTWA_NUMBER_SWITCH_20261031.md'
+      - 'deploy/caddy/**'
       - '.github/workflows/go-test.yml'
 concurrency:
   group: botwhatsapp-go-${{ github.ref }}
@@ -32,6 +42,20 @@ jobs:
           cache: false
       - run: go vet ./...
       - run: go test -count=1 ./...
+      # Strictly offline fake-config release preflight (no credentials/network).
+      - run: bash scripts/preflight-ctwa-production-readonly.test.sh
+      - run: python3 scripts/configure-ctwa-secrets.test.py -v
+      - run: python3 scripts/audit-ctwa-panel-readonly.test.py -v
+      - run: python3 scripts/sync-ctwa-crm-names-readonly.test.py -v
+      - run: python3 scripts/validate-ctwa-crm-contract.py
+      - run: python3 scripts/audit-ctwa-legacy-422-readonly.test.py -v
+      - run: bash -n scripts/audit-ctwa-dns-readonly.sh
+      - run: python3 -m py_compile scripts/audit_relay_spool_readonly.py scripts/preflight_evolution_relay_contract_readonly.py
+      - run: python3 -m unittest scripts/test_relay_forensic_readonly.py -v
+      - run: python3 -m py_compile scripts/preflight_ctwa_account_switch.py
+      - run: python3 -m unittest scripts/test_preflight_ctwa_account_switch.py -v
+      - run: python3 scripts/check_ctwa_public_docs.py
+      - run: python3 -m unittest scripts/test_check_ctwa_public_docs.py -v
       # Concurrency guard for the journal, policy updates and webhook fan-out.
       # Runs once per code change; no network calls or production credentials.
       - run: go test -race -count=1 ./internal/outbox ./internal/ingress ./internal/relay

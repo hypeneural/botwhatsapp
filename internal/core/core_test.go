@@ -14,7 +14,7 @@ func TestRouting(t *testing.T){
  a:=fixture("ads-uuid","5548996425287@s.whatsapp.net","  OLÁ!  QUERO a proposta Natal 2026. ","msg1")
  if got:=Select(a,c);got.Action!=AdsProposal||got.CRMPhone!="48996425287"{t.Fatalf("ads: %+v",got)}
  a.Data.Info.IsFromMe=true
- if got:=Select(a,c);got.Action!=Ignore {t.Fatalf("own message: %+v",got)}
+ if got:=Select(a,c);got.Action!=OutboundObserved {t.Fatalf("own message must be recorded but never answered: %+v",got)}
  a.Data.Info.IsFromMe=false;a.Data.Info.Chat="12345@lid"
  if got:=Select(a,c);got.Action!=Ignore{t.Fatalf("lid must not become CRM phone: %+v",got)}
  a=fixture("greet-uuid","5548996425287@s.whatsapp.net","5","msg2")
@@ -45,4 +45,15 @@ func TestSenderAltAndOptOut(t *testing.T){
 func TestCRMPhone(t *testing.T){
  for _,s:=range []string{"5548996425287","554832200440"} {if _,ok:=CRMPhone(s);!ok{t.Fatal(s)}}
  for _,s:=range []string{"48996425287","551234","5599ABCDEF999","5511111111111111"} {if _,ok:=CRMPhone(s);ok{t.Fatal("accepted",s)}}
+}
+func TestLIDAliasPreservedOnEvolutionChatPhoneSwap(t *testing.T) {
+	cfg := Config{AdsUUID:"ads", AdsTriggers:[]string{"quero natal"}}
+	e := fixture("ads","5548999990001@s.whatsapp.net","quero natal","lid-swap")
+	e.Data.Info.SenderAlt = "777777@lid"
+	e.Data.Info.PushName = "Nome WhatsApp"
+	d := Select(e,cfg)
+	if d.PhoneE164!="5548999990001" || d.LIDAlias!="777777@lid" ||
+		d.Name!="Nome WhatsApp" || d.Action!=AdsProposal {
+		t.Fatalf("explicit JID mapping lost: %+v", d)
+	}
 }

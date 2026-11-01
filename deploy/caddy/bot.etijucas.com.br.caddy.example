@@ -1,0 +1,29 @@
+# STANDALONE PROPOSAL ONLY — bot.etijucas.com.br
+# Do not replace the VPS's existing Caddyfile; merge this host block after
+# inspecting its live config. Requires a validated DNS A/AAAA record, public
+# reachability 80/443 (for ACME if relevant), and actual upstream connectivity.
+#
+# Assumes the Caddy runtime is on SAME HOST as the bot's loopback mapping
+# 127.0.0.1:8788. If Caddy runs as a Docker container on shared network,
+# substitute bot:8788 ONLY AFTER inspecting container/service/network.
+#
+# The public hostname serves only authenticated manager endpoints; NEVER
+# publish /static (private media), /webhook (secret-bearing routes), or spool.
+bot.etijucas.com.br {
+    encode zstd gzip
+
+    header {
+        X-Content-Type-Options nosniff
+        Referrer-Policy no-referrer
+        Strict-Transport-Security "max-age=31536000"
+    }
+
+    @panel path /painel /dashboard /api/dashboard/*
+    handle @panel {
+        reverse_proxy 127.0.0.1:8788
+    }
+
+    handle {
+        respond "Não encontrado" 404
+    }
+}

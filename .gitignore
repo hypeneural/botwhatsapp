@@ -41,3 +41,8 @@ testdata/*.png
 *.override.yaml
 *.override.yml
 deploy/*.override.yaml
+
+# Python local cache
+__pycache__/
+*.py[cod]
+*$py.class

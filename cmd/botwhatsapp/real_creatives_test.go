@@ -32,8 +32,8 @@ func TestConfiguredRealCreativesBothMatchNoBroadTrigger(t *testing.T){
  }
  for _,str:=range []string{"Oi, Natal","Quero orçamento","Quero conhecer os pacotes de natal em Florianópolis"}{
   e.Data.Message.Extended.Text=str
-  if d:=core.Select(e,cfg);d.Action!=core.Greeting{
-   t.Fatalf("%q should greet, not schedule: %+v",str,d)
+  if d:=core.Select(e,cfg);d.Action!=core.Ignore{
+   t.Fatalf("%q must remain organic and never auto-greet: %+v",str,d)
   }
  }
  // Even when a provider produces an unusual numeric Chat JID, the explicit

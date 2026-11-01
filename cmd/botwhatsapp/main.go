@@ -49,6 +49,9 @@ func main() {
 	enabled := os.Getenv("BOT_ENABLED") == "true"
 	outboundEnabled := os.Getenv("BOT_OUTBOUND_ENABLED") == "true"
 	opAuth := os.Getenv("BOT_OPERATIONAL_AUTHORIZATION") == "true"
+	if enabled && len(strings.TrimSpace(os.Getenv("BOT_DASHBOARD_TOKEN"))) < 32 {
+		log.Fatal("BOT_ENABLED requires BOT_DASHBOARD_TOKEN with at least 32 characters")
+	}
 	if outboundEnabled && (!enabled || !opAuth) {
 		log.Fatal("outbound must have BOT_ENABLED=true and BOT_OPERATIONAL_AUTHORIZATION=true")
 	}
@@ -61,6 +64,41 @@ func main() {
 		log.Fatalf("invalid ad trigger configuration: %T", err)
 	}
 
+	// Ads identity comes from an explicitly configured E.164 number and
+	// Evolution UUID. Before changing accounts, the read-only production
+	// preflight must verify the UUID/phone/token/webhook binding. Never
+	// redirect a conversation simply because the phone ENV changed.
+	adsPhone, greetingPhone := "", ""
+	if adsUUID != "" {
+		adsPhone, err = adsPhoneFromEnv(os.Getenv)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	if greetingUUID != "" {
+		greetingPhone, err = greetingPhoneFromEnv(os.Getenv, adsPhone)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	// This optional alias is the JID actually paired in Evolution/Whatsmeow,
+	// captured by read-only provider inventory. Do not silently remove/add '9'.
+	// It protects own-message echoes if the publicly advertised E.164 differs
+	// from the WhatsApp registered JID. An alias is never used as a lead phone.
+	var adsOwnAliases []string
+	if adsUUID != "" && strings.TrimSpace(os.Getenv("BOT_ADS_PAIRED_JID")) != "" {
+		paired, ok := core.JIDPhone(strings.TrimSpace(os.Getenv("BOT_ADS_PAIRED_JID")))
+		if !ok {
+			log.Fatal("BOT_ADS_PAIRED_JID must be an explicitly verified WhatsApp phone JID")
+		}
+		if paired != adsPhone {
+			adsOwnAliases = []string{paired}
+		}
+		if greetingPhone != "" && paired == greetingPhone {
+			log.Fatal("paired Ads JID cannot equal Greeting business number")
+		}
+	}
+
 	defs := make([]instances.Definition, 0, 2)
 	secrets := make(map[string]string)
 	senders := make(map[string]outbox.EvolutionSender)
@@ -71,10 +109,11 @@ func main() {
 	if adsUUID != "" {
 		defs = append(defs, instances.Definition{
 			Slug: "ads", InstanceUUID: adsUUID,
-			BusinessPhoneE164: env("BOT_ADS_PHONE", "554832200440"),
-			Role:              instances.Ads, Enabled: true, TokenEnv: "EVOLUTION_ADS_APIKEY",
+			BusinessPhoneE164:    adsPhone,
+			BusinessPhoneAliases: adsOwnAliases,
+			Role:                 instances.Ads, Enabled: true, TokenEnv: "EVOLUTION_ADS_APIKEY",
 			WebhookSecretEnv: "BOT_ADS_WEBHOOK_SECRET",
-			AdsTriggers:      triggers, AdsFallback: env("BOT_ADS_FALLBACK_MENU", "true") == "true", CRMAllowed: true,
+			AdsTriggers:      triggers, AdsFallback: false, CRMAllowed: true,
 		})
 		secrets["ads"] = os.Getenv("BOT_ADS_WEBHOOK_SECRET")
 		if outboundEnabled {
@@ -88,7 +127,7 @@ func main() {
 	if greetingUUID != "" {
 		defs = append(defs, instances.Definition{
 			Slug: "greeting", InstanceUUID: greetingUUID,
-			BusinessPhoneE164: env("BOT_GREETING_PHONE", "5548996425287"),
+			BusinessPhoneE164: greetingPhone,
 			Role:              instances.Greeting, Enabled: true, TokenEnv: "EVOLUTION_GREETING_APIKEY",
 			WebhookSecretEnv: "BOT_GREETING_WEBHOOK_SECRET",
 		})
@@ -124,7 +163,7 @@ func main() {
 	}
 	coreCfg := core.Config{
 		AdsUUID: adsUUID, GreetingUUID: greetingUUID, AdsTriggers: triggers,
-		AdsFallback: env("BOT_ADS_FALLBACK_MENU", "true") == "true",
+		AdsFallback: false,
 	}
 
 	var worker *outbox.Worker
@@ -133,24 +172,16 @@ func main() {
 		if err != nil {
 			log.Fatal("cannot initialize durable outbox: ", err)
 		}
-		var crmInstanceID *int
-		if id, err := strconv.Atoi(os.Getenv("EVIDENCIA_CRM_OUTBOUND_MESSAGE_INSTANCE_ID")); err == nil && id > 0 {
-			crmInstanceID = &id
+		nativeToken := strings.TrimSpace(os.Getenv("EVIDENCIA_CRM_PROPOSAL_SANCTUM_TOKEN"))
+		if adsUUID != "" && nativeToken == "" {
+			log.Fatal("ads proposal requires EVIDENCIA_CRM_PROPOSAL_SANCTUM_TOKEN (native CRM endpoint); legacy campaign 416 is blocked")
 		}
-		if adsUUID != "" && crmInstanceID == nil {
-			log.Fatal("ads CRM dispatch requires explicit positive EVIDENCIA_CRM_OUTBOUND_MESSAGE_INSTANCE_ID")
-		}
+
 		loc, err := time.LoadLocation("America/Sao_Paulo")
 		if err != nil {
 			log.Fatal("America/Sao_Paulo timezone is required for shared CRM claim")
 		}
-		if adsUUID != "" && strings.TrimSpace(os.Getenv("EVIDENCIA_CRM_AUTHORIZATION")) == "" {
-			log.Fatal("ads campaign requires EVIDENCIA_CRM_AUTHORIZATION")
-		}
-		crmClient := crm.Client{
-			BaseURL:       env("EVIDENCIA_CRM_BASE_URL", "https://evydencia.com"),
-			Authorization: os.Getenv("EVIDENCIA_CRM_AUTHORIZATION"),
-		}
+
 		audio := readAsset("BOT_ADS_AUDIO_FILE")
 		image := readAsset("BOT_GREETING_IMAGE_FILE")
 		adImage := readAsset("BOT_ADS_IMAGE_FILE")
@@ -187,18 +218,10 @@ func main() {
 			}
 			adWelcome = string(raw)
 		}
-		adClosing := env("BOT_ADS_CLOSING_TEXT", "O nosso outro WhatsApp vai entrar em contato com mais informações também, mas qualquer dúvida pode falar.")
-		if path := os.Getenv("BOT_ADS_CLOSING_TEXT_FILE"); path != "" {
-			raw, err := os.ReadFile(path)
-			if err != nil || strings.TrimSpace(string(raw)) == "" {
-				log.Fatal("invalid ad closing text file")
-			}
-			adClosing = string(raw)
-		}
 		cfg := outbox.Config{
 			DataDir: dataDir, GreetingCooldown: 24 * time.Hour, AdsFlowCooldown: time.Duration(adsCooldownHours) * time.Hour,
-			CRMInstanceID:            crmInstanceID,
 			OperationalAuthorization: opAuth,
+			NativeProposalScheduler:  crm.NativeClient{BaseURL: env("EVIDENCIA_CRM_BASE_URL", "https://evydencia.com"), BearerToken: nativeToken},
 			AdReactionEmoji:          env("BOT_ADS_REACTION_EMOJI", "🎄"),
 			AdAudioFixture:           audio,
 			AdDocumentFixture:        adDoc,
@@ -209,11 +232,10 @@ func main() {
 			AdImageFixture:           adImage,
 			AdVideoFixture:           adVideo,
 			AdWelcomeText:            adWelcome,
-			AdClosingText:            adClosing,
 			Tenant:                   env("BOT_TENANT", "estudio-evydencia"),
 			Location:                 loc,
-			TaskRetention:            7 * 24 * time.Hour,
-			MaxTasksCount:            10000,
+			TaskRetention:            30 * 24 * time.Hour,
+			MaxTasksCount:            20000,
 			Senders:                  senders,
 		}
 		if path := os.Getenv("BOT_ADS_IMAGE_CAPTION_FILE"); path != "" {
@@ -241,7 +263,7 @@ func main() {
 			}
 			cfg.GreetingCaption = string(raw)
 		}
-		worker, err = outbox.NewWorker(cfg, store, nil, crmClient)
+		worker, err = outbox.NewWorker(cfg, store, nil, nil)
 		if err != nil {
 			log.Fatal("outbox worker init: ", err)
 		}
@@ -308,6 +330,9 @@ func main() {
 				case <-maintenance.C:
 					if _, err := worker.PruneCompleted(); err != nil {
 						log.Printf("outbox maintenance unavailable: %T", err)
+					}
+					if _, err := ingress.PruneHistory(dataDir, 90*24*time.Hour, 30000); err != nil {
+						log.Printf("ingress history maintenance unavailable: %T", err)
 					}
 				}
 			}

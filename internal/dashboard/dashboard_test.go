@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -36,7 +37,7 @@ func TestFriendlyStep(t *testing.T) {
 	if FriendlyStep("send_ad_reaction") != "Reação Natalina 🎄" {
 		t.Errorf("unexpected step description")
 	}
-	if FriendlyStep("schedule_natal_crm") != "Campanha CRM 416" {
+	if FriendlyStep("schedule_natal_crm") != "Agendamento da proposta no CRM" {
 		t.Errorf("unexpected step description")
 	}
 	if FriendlyStep("send_greeting_text_menu") != "Menu de Opções 1–5" {
@@ -159,7 +160,8 @@ func TestDashboardServiceAndHandler(t *testing.T) {
 	}
 
 	// 2. Authorized HTML request
-	reqAuth := httptest.NewRequest(http.MethodGet, "/painel?token=secret-token-123", nil)
+	reqAuth := httptest.NewRequest(http.MethodGet, "/painel", nil)
+	reqAuth.SetBasicAuth("operador", "secret-token-123")
 	wAuth := httptest.NewRecorder()
 	handler.ServeHTTP(wAuth, reqAuth)
 	if wAuth.Code != http.StatusOK {
@@ -170,7 +172,8 @@ func TestDashboardServiceAndHandler(t *testing.T) {
 	}
 
 	// 3. Authorized JSON API request
-	reqJSON := httptest.NewRequest(http.MethodGet, "/api/dashboard/contacts?token=secret-token-123", nil)
+	reqJSON := httptest.NewRequest(http.MethodGet, "/api/dashboard/contacts", nil)
+	reqJSON.SetBasicAuth("operador", "secret-token-123")
 	wJSON := httptest.NewRecorder()
 	handler.ServeHTTP(wJSON, reqJSON)
 	if wJSON.Code != http.StatusOK {
@@ -183,5 +186,39 @@ func TestDashboardServiceAndHandler(t *testing.T) {
 	}
 	if jsonSummary.Stats.TotalContacts != 2 {
 		t.Errorf("JSON API TotalContacts = %d, want 2", jsonSummary.Stats.TotalContacts)
+	}
+}
+
+func TestManagerPanelResponsiveAndReadOnly(t *testing.T) {
+	h := NewHandler(t.TempDir(), "fake-preview-only")
+	req := httptest.NewRequest(http.MethodGet, "/painel", nil)
+	req.SetBasicAuth("gestor", "fake-preview-only")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("unexpected status %d", w.Code)
+	}
+	html := w.Body.String()
+	required := []string{
+		"Monitor de mensagens", "Histórico de atendimentos", "Precisam de atenção",
+		"@media(max-width:700px)", "id=\"eventRows\"", "id=\"filterSource\"",
+		"id=\"filterStatus\"", "id=\"contactsDetails\"",
+		"/api/dashboard/events", "escapeHTML", // replaced below by safe()
+	}
+	for _, token := range required {
+		if token == "escapeHTML" {
+			token = "function safe(value)"
+		}
+		if !strings.Contains(html, token) {
+			t.Errorf("manager page missing %q", token)
+		}
+	}
+	for _, blocked := range []string{"<script src=", "https://cdn.", "fetch('/api/campaigns/schedule", "?token="} {
+		if strings.Contains(html, blocked) {
+			t.Errorf("unexpected external/write source %q", blocked)
+		}
+	}
+	if w.Header().Get("X-Frame-Options") != "DENY" || !strings.Contains(w.Header().Get("Cache-Control"), "no-store") {
+		t.Fatal("sensitive management dashboard headers missing")
 	}
 }

@@ -15,7 +15,7 @@ func TestAdsRegistryHonorsFallbackAndSeparateGreetingInstance(t *testing.T){
  if err!=nil{t.Fatal(err)}
  for _,tc:=range []struct{id,text string;action core.Action}{
   {"ads-uuid","pacotes de Natal",core.AdsProposal},
-  {"ads-uuid","Oi tudo bem",core.Greeting},
+  {"ads-uuid","Oi tudo bem",core.Ignore},
   {"greeting-uuid","pacotes de Natal",core.Greeting},
  }{
   e:=core.Envelope{Event:"Message",InstanceID:tc.id}
