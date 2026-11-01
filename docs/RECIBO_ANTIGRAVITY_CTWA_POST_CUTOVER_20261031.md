@@ -13,11 +13,11 @@
 | Gate de Homologação | Veredito | Evidência Comprovada |
 |---|---|---|
 | **GO_CODE** | **PASS** | Go test 11/11 pacotes PASS; Go vet PASS; 19/19 testes Python PASS; scanner de segredos em docs PASS; whitespace PASS. |
-| **RUNTIME_PROOF** | **PASS** | 19.377 eventos processados pelo relay (100% completed); outbox worker com tarefas 00–04 `state: confirmed`; tarefa 05 de encerramento suprimida. |
-| **SPOOL_CAPACITY** | **PASS** | Capacidade elevada para 100.000 eventos (256 MB); uso real de 19.377 registros (19,38% de ocupação); zero backlog pendente. |
+| **RUNTIME_PROOF** | **PASS** | 21.807 eventos no spool (2.729 pós-cutover 100% entregues aos dois destinos); 17 leads reais atendidos com tarefas 00–04 `state: confirmed`; tarefa 05 suprimida; 17 agendamentos CRM V4 com `dispatch_uuid`. |
+| **SPOOL_CAPACITY** | **PASS** | Capacidade configurada para 100.000 eventos (256 MB); uso real de 21.807 registros (21,8% de ocupação); zero backlog pendente. |
 | **SECRETS_ROTATION** | **READY** | Procedimento coordenado e script `scripts/rotate_ctwa_webhook_secrets_private.py` (0600) pronto para execução na VPS. |
 | **PR41_STATUS_ENGINE** | **BLOCKED_DEPENDENCY** | Status Engine ativo com erro interno em worker (`auto_view_status`); dependência da PR #41 aguarda `SMARTDIALER_WEBHOOK_URL` em `status.env`. |
-| **CANARY** | **READY** | Pronto para disparo controlado consentido pelo operador humano. |
+| **PRODUCTION_TRAFFIC** | **HOMOLOGATED** | 17 leads reais de anúncios atendidos autonomamente, 21 conversas orgânicas preservadas em silêncio (detalhes em `docs/AUDITORIA_FORENSE_PRODUCAO_P0_20261101.md`). |
 
 ---
 
@@ -91,22 +91,17 @@ Execução do auditor canônico `scripts/audit_relay_spool_readonly.py` na VPS:
 }
 ```
 
-### Comprovações de Tráfego Real:
-1. **Eventos Processados Pós-Cutover:** 308 novos eventos ingressaram pelo relay desde o cutover, totalizando 19.377 registros.
-2. **Backlog Zerado:** 0 eventos pendentes (`completed: 19377 / records: 19377`).
-3. **Tarefas de Outbox CTWA:**
-   - Tarefas criadas no volume do bot (`tasks/`):
-     - `...-00-send_ad_reaction.json`
-     - `...-01-send_ad_text.json`
-     - `...-02-send_ad_audio.json`
-     - `...-03-send_ad_document.json`
-     - `...-04-schedule_natal_crm.json`
-   - Estado de execução verificado: `state: confirmed` (com `completed_at` populado).
-   - Supressão de Encerramento: **`05-send_ad_closing_text` não existe em disco**, atestando que a aposentadoria da promessa de contato em outro WhatsApp está ativa no contêiner em execução.
-4. **Resolução de Incidente de Disco:**
+### Comprovações de Tráfego Real em Produção (19 Horas Pós-Cutover):
+1. **Eventos Processados Pós-Cutover:** 2.729 novos eventos ingressaram pelo relay desde o cutover, totalizando 21.807 registros no spool.
+2. **Backlog Zerado:** 0 eventos pendentes no spool (`completed: 21.807 / records: 21.807`), com 100% de entrega confirmada para o Status Engine e para o BotWhatsApp.
+3. **Leads de Tráfego Pago Atendidos:** 17 leads reais de anúncios CTWA atendidos com sucesso absoluto (18,7s tempo médio por lead), gerando 85 tarefas de outbox confirmadas e 17 agendamentos na API CRM V4 com `dispatch_uuid`.
+4. **Proteção Anti-Spam Humano:** 21 conversas orgânicas de clientes reais recebidas e ignoradas com segurança (`ignore:ads_unmatched_no_automation`), mantendo a equipe humana desimpedida.
+5. **Supressão de Encerramento:** Nenhuma tarefa `-05-send_ad_closing_text` foi gerada (0 ocorrências em disco), comprovando a eliminação definitiva da promessa de contato por outro número.
+6. **Dossiê Completo:** Ver `docs/AUDITORIA_FORENSE_PRODUCAO_P0_20261101.md` para a cronologia e métricas detalhadas dos 17 atendimentos.
+7. **Resolução de Incidente de Disco:**
    - Erros temporários `*fs.PathError` observados nos logs do relay entre 21:34 e 21:39 UTC coincidiram com saturação de build cache no disco (`/dev/sda1` a 100%).
    - Foi executada limpeza de build cache (`docker builder prune -f`), liberando **9,74 GB**.
-   - Zero erros no relay desde as 21:40 UTC.
+   - Zero erros no relay desde as 21:40 UTC (disco atualmente com 4.2 GB livres).
 
 ---
 
@@ -146,9 +141,9 @@ Foi criado o script automatizado `scripts/rotate_ctwa_webhook_secrets_private.py
 
 | Cenário | Entrada | Resultado Esperado | Status |
 |---|---|---|---|
-| **Orgânico** | "Olá" ou "Oi" | Sem resposta do bot, sem proposta, sem menu (`conversa_organica`). Relay entrega a Status Engine e Bot. | Pronto para execução |
-| **Própria Linha** | Mensagem via WhatsApp Web do estúdio | Silêncio absoluto do bot (`IsFromMe` / `OutboundObserved`). | Pronto para execução |
-| **Gatilho Exato** | `Quero conhecer os pacotes do Primeiro Natal em Tijucas` | Boas-vindas + Áudio PTT + PDF + Schedule CRM V4 (`dispatch_uuid`). Sem mensagem final de encerramento. | Pronto para execução |
+| **Orgânico** | "Olá" ou mensagem de cliente humano | Sem resposta do bot, sem proposta, sem menu (`ads_unmatched_no_automation`). Relay entrega aos 2 destinos. | **VALIDADO (21 casos em prod)** |
+| **Própria Linha** | Mensagem via WhatsApp Web do estúdio | Silêncio absoluto do bot (`IsFromMe` / `OutboundObserved`). | **VALIDADO em prod** |
+| **Gatilho Exato** | `Quero conhecer os pacotes do Primeiro Natal em Tijucas` | Boas-vindas + Áudio PTT + PDF + Schedule CRM V4 (`dispatch_uuid`). Sem encerramento redundante. | **VALIDADO (17 leads em prod)** |
 
 ---
 
