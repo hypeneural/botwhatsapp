@@ -46,6 +46,8 @@ type EventRow struct {
 	TriggerMatched bool        `json:"trigger_matched"`
 	TriggerText    string      `json:"trigger_text,omitempty"`
 	HasAdContext   bool        `json:"has_ad_context"`
+	AdSourceID     string      `json:"ad_source_id,omitempty"`
+	AdEvidence     string      `json:"ad_evidence,omitempty"`
 	Decision       string      `json:"decision"`
 	DecisionReason string      `json:"decision_reason,omitempty"`
 	Status         string      `json:"status"`
@@ -80,6 +82,8 @@ type inboundJournal struct {
 		Text         string `json:"text"`
 		Source       string `json:"source"`
 		HasAdContext bool   `json:"has_ad_context"`
+		AdSourceID string `json:"ad_source_id"`
+		AdEvidence string `json:"ad_evidence"`
 		TriggerMatch bool   `json:"trigger_match"`
 		TriggerText  string `json:"trigger_text"`
 	} `json:"inbound"`
@@ -202,6 +206,7 @@ func (s *Service) getEventsUncached(limit int) (EventResult, error) {
 			InboundText: rec.Inbound.Text, TriggerMatched: rec.Inbound.TriggerMatch ||
 				rec.Decision.Action == core.AdsProposal,
 			TriggerText: rec.Inbound.TriggerText, HasAdContext: rec.Inbound.HasAdContext,
+			AdSourceID: rec.Inbound.AdSourceID, AdEvidence: rec.Inbound.AdEvidence,
 			Decision: string(rec.Decision.Action), DecisionReason: rec.Decision.Reason,
 			Status: "recebido", Steps: make([]EventStep, 0),
 		}
